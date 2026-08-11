@@ -564,8 +564,57 @@
   var RISK_EMOJI = ["🍃", "🌫️", "🔥"];
   var RISK_TEXT = ["no big fires that way", "some fires that way", "fire country that way"];
 
-  Promise.all([fetchWeather(), fetchJSON(AIR_URL), fetchFires()]).then(function (r) {
-    render(r[0], r[1], r[2]);
+  // ---- Live PurpleAir sensors ----
+  // Family read key (rotate at develop.purpleair.com if it ever gets abused;
+  // a key pasted into the app's box overrides this one on that device).
+  var DEFAULT_PA_KEY = "F0A0551A-953B-11F1-9E30-4201AC1DC129";
+  function fetchPaSensors(key) {
+    var url = "https://api.purpleair.com/v1/sensors" +
+      "?fields=" + encodeURIComponent("name,latitude,longitude,pm2.5_10minute") +
+      "&location_type=0&max_age=7200" +
+      "&nwlng=-116.65&nwlat=48.95&selng=-115.75&selat=48.55";
+    return fetch(url, { headers: { "X-API-Key": key } }).then(function (r) {
+      if (r.status === 403) throw new Error("badkey");
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (data) {
+      var fi = {};
+      (data.fields || []).forEach(function (f, idx) { fi[f] = idx; });
+      return (data.data || []).map(function (row) {
+        var raw = row[fi["pm2.5_10minute"]];
+        if (raw == null) return null;
+        // Raw reading, conversion "None" — matches the family's PurpleAir map settings
+        return {
+          name: row[fi.name],
+          dist: distMiles(LAT, LON, row[fi.latitude], row[fi.longitude]),
+          aqi: pm25ToAqi(Math.max(0, raw))
+        };
+      }).filter(Boolean).sort(function (a, b) { return a.dist - b.dist; });
+    });
+  }
+  // Fetched together with the forecasts so the page paints once, with the live
+  // number already in place (no flash of model numbers). Never rejects; gives
+  // up after 5 s and lets the model stand in.
+  function fetchPaInitial() {
+    var stored = null;
+    try { stored = localStorage.getItem("purpleairKey"); } catch (e) {}
+    var req = fetchPaSensors(stored || DEFAULT_PA_KEY).then(function (s) {
+      return { status: "ok", sensors: s };
+    }).catch(function (e) {
+      if (e.message === "badkey" && stored) {
+        // a pasted key went bad — clear it and fall back to the built-in one
+        try { localStorage.removeItem("purpleairKey"); } catch (e2) {}
+        return fetchPaSensors(DEFAULT_PA_KEY).then(function (s) { return { status: "ok", sensors: s }; })
+          .catch(function (e3) { return { status: e3.message === "badkey" ? "badkey" : "fail" }; });
+      }
+      return { status: e.message === "badkey" ? "badkey" : "fail" };
+    });
+    var timeout = new Promise(function (res) { setTimeout(function () { res({ status: "fail" }); }, 5000); });
+    return Promise.race([req, timeout]);
+  }
+
+  Promise.all([fetchWeather(), fetchJSON(AIR_URL), fetchFires(), fetchPaInitial()]).then(function (r) {
+    render(r[0], r[1], r[2], r[3]);
   }).catch(function (err) {
     el("loading").style.display = "none";
     var e = el("error");
@@ -585,7 +634,7 @@
     return 500;
   }
 
-  function render(wx, air, fires) {
+  function render(wx, air, fires, pa) {
     el("loading").style.display = "none";
     el("app").style.display = "block";
     el("updated").textContent = "Updated " + new Date().toLocaleString("en-US", { timeZone: TZ }) + " · reopen or pull down to refresh";
@@ -617,6 +666,7 @@
     var i;
     for (i = 0; i < aT.length; i++) aqiByTime[aT[i]] = aAqi[i];
     for (i = 0; i < hT.length; i++) wdByTime[hT[i]] = hWd[i];
+    var aAqiRaw = aAqi.slice();
 
     var nowIso = wx.current.time.slice(0, 13);
     var startIdx = 0;
@@ -865,114 +915,81 @@
         out.appendChild(row);
       }
     }
-    renderOutdoors();
-
     // ----- Live PurpleAir sensors -----
-    // Family read key (rotate at develop.purpleair.com if it ever gets abused;
-    // a key pasted into the box below overrides this one on that device).
-    var DEFAULT_PA_KEY = "F0A0551A-953B-11F1-9E30-4201AC1DC129";
-    (function setupPurpleAir() {
-      var setup = el("paSetup"), line = el("liveLine");
-      var key = null;
-      try { key = localStorage.getItem("purpleairKey"); } catch (e) {}
-      var usingDefault = !key;
-      if (!key) key = DEFAULT_PA_KEY;
+    var paSetupEl = el("paSetup"), paLine = el("liveLine");
+    function paNote(msg) { paLine.style.display = "block"; paLine.textContent = msg; }
+    function paShowSetup(msg) { paSetupEl.style.display = "block"; if (msg) paNote(msg); }
 
-      function note(msg) { line.style.display = "block"; line.textContent = msg; }
-      function showSetup(msg) { setup.style.display = "block"; if (msg) note(msg); }
-
-      el("paSave").addEventListener("click", function () {
-        var v = el("paKey").value.trim();
-        if (!v) return;
-        try { localStorage.setItem("purpleairKey", v); } catch (e) {}
-        setup.style.display = "none";
-        loadLive(v);
+    // Repaint the "right now" number from sensors and re-anchor the near-term
+    // forecast to them. Returns false if there were no usable sensors.
+    function applyLiveSensors(sensors) {
+      if (!sensors || !sensors.length) return false;
+      var wsum = 0, sum = 0;
+      sensors.slice(0, 5).forEach(function (s) {
+        var w = 1 / (s.dist * s.dist + 0.25);
+        wsum += w; sum += s.aqi * w;
       });
+      liveAqi = Math.round(sum / wsum);
+      var lvl2 = aqiLevel(liveAqi);
+      el("aqiVal").textContent = liveAqi;
+      el("aqiBadge").style.background = lvl2.color;
+      el("aqiCat").textContent = lvl2.name;
+      el("aqiCat").style.color = lvl2.color;
+      el("aqiAdvice").textContent = lvl2.advice;
+      var n = Math.min(5, sensors.length);
+      paNote("\ud83d\udce1 Live from " + n + " PurpleAir sensor" + (n > 1 ? "s" : "") + " near us (nearest: " +
+             sensors[0].name + ", " + sensors[0].dist.toFixed(1) + " mi) \u00b7 the forecast model says " + nowAqi + ".");
 
-      loadLive(key);
-
-      function loadLive(k) {
-        // Outdoor sensors within ~25 mi of Moyie Springs, reporting in the last 2 h
-        var url = "https://api.purpleair.com/v1/sensors" +
-          "?fields=" + encodeURIComponent("name,latitude,longitude,pm2.5_10minute") +
-          "&location_type=0&max_age=7200" +
-          "&nwlng=-116.65&nwlat=48.95&selng=-115.75&selat=48.55";
-        fetch(url, { headers: { "X-API-Key": k } }).then(function (r) {
-          if (r.status === 403) throw new Error("badkey");
-          if (!r.ok) throw new Error("HTTP " + r.status);
-          return r.json();
-        }).then(function (data) {
-          var fi = {};
-          (data.fields || []).forEach(function (f, idx) { fi[f] = idx; });
-          var sensors = (data.data || []).map(function (row) {
-            var raw = row[fi["pm2.5_10minute"]];
-            if (raw == null) return null;
-            // Raw reading, conversion "None" — matches the family's PurpleAir map settings
-            return {
-              name: row[fi.name],
-              dist: distMiles(LAT, LON, row[fi.latitude], row[fi.longitude]),
-              aqi: pm25ToAqi(Math.max(0, raw))
-            };
-          }).filter(Boolean).sort(function (a, b) { return a.dist - b.dist; });
-
-          if (!sensors.length) {
-            showSetup("No live sensors reporting nearby right now — using the forecast model instead.");
-            return;
-          }
-          // closer sensors count more
-          var wsum = 0, sum = 0;
-          sensors.slice(0, 5).forEach(function (s) {
-            var w = 1 / (s.dist * s.dist + 0.25);
-            wsum += w; sum += s.aqi * w;
-          });
-          liveAqi = Math.round(sum / wsum);
-
-          var lvl2 = aqiLevel(liveAqi);
-          el("aqiVal").textContent = liveAqi;
-          el("aqiBadge").style.background = lvl2.color;
-          el("aqiCat").textContent = lvl2.name;
-          el("aqiCat").style.color = lvl2.color;
-          el("aqiAdvice").textContent = lvl2.advice;
-          var n = Math.min(5, sensors.length);
-          note("📡 Live from " + n + " PurpleAir sensor" + (n > 1 ? "s" : "") + " near us (nearest: " +
-               sensors[0].name + ", " + sensors[0].dist.toFixed(1) + " mi) · the forecast model says " + nowAqi + ".");
-          renderHero(parseInt(thInput.value, 10) || 100);
-
-          // When the model disagrees with our sensors, nudge the next 48 h of
-          // forecast toward reality (full correction now, fading to none at +48 h).
-          var offset = liveAqi - nowAqi;
-          if (Math.abs(offset) >= 10) {
-            var i0 = 0, q;
-            for (q = 0; q < aT.length; q++) { if (aT[q].slice(0, 13) >= nowIso) { i0 = q; break; } }
-            for (q = 0; q < aAqi.length; q++) {
-              if (aAqi[q] == null) continue;
-              var w = q < i0 ? 1 : Math.max(0, 1 - (q - i0) / 48);
-              aAqi[q] = Math.max(0, aAqi[q] + offset * w);
-            }
-            renderOutdoors();
-            renderDays();
-            renderHours();
-            var adj = el("adjNote");
-            adj.style.display = "block";
-            adj.textContent = "📡 The next 2 days were adjusted toward our live sensors (the model was reading about " +
-              Math.abs(Math.round(offset)) + " points too " + (offset < 0 ? "high" : "low") + " for our valley).";
-          }
-        }).catch(function (err) {
-          if (err.message === "badkey") {
-            if (!usingDefault) {
-              // a pasted key failed — clear it and fall back to the built-in one
-              try { localStorage.removeItem("purpleairKey"); } catch (e) {}
-              usingDefault = true;
-              loadLive(DEFAULT_PA_KEY);
-              return;
-            }
-            showSetup("The built-in PurpleAir key isn't working — it may have been disabled. Paste a fresh read key here.");
-          } else {
-            note("Couldn't reach PurpleAir right now — using the forecast model instead.");
-          }
-        });
+      // When the model disagrees with our sensors, nudge the next 48 h of
+      // forecast toward reality (full correction now, fading to none at +48 h).
+      var offset = liveAqi - nowAqi;
+      var q;
+      if (Math.abs(offset) >= 10) {
+        var i0 = 0;
+        for (q = 0; q < aT.length; q++) { if (aT[q].slice(0, 13) >= nowIso) { i0 = q; break; } }
+        for (q = 0; q < aAqi.length; q++) {
+          if (aAqiRaw[q] == null) continue;
+          var w2 = q < i0 ? 1 : Math.max(0, 1 - (q - i0) / 48);
+          aAqi[q] = Math.max(0, aAqiRaw[q] + offset * w2);
+        }
+        var adj = el("adjNote");
+        adj.style.display = "block";
+        adj.textContent = "\ud83d\udce1 The next 2 days were adjusted toward our live sensors (the model was reading about " +
+          Math.abs(Math.round(offset)) + " points too " + (offset < 0 ? "high" : "low") + " for our valley).";
+      } else {
+        for (q = 0; q < aAqi.length; q++) aAqi[q] = aAqiRaw[q];
+        el("adjNote").style.display = "none";
       }
-    })();
+      return true;
+    }
+
+    el("paSave").addEventListener("click", function () {
+      var v = el("paKey").value.trim();
+      if (!v) return;
+      try { localStorage.setItem("purpleairKey", v); } catch (e) {}
+      paSetupEl.style.display = "none";
+      fetchPaSensors(v).then(function (s) {
+        if (applyLiveSensors(s)) { renderOutdoors(); renderDays(); renderHours(); }
+        else paNote("No live sensors reporting nearby right now \u2014 using the forecast model instead.");
+      }).catch(function (err) {
+        if (err.message === "badkey") {
+          try { localStorage.removeItem("purpleairKey"); } catch (e) {}
+          paShowSetup("That key didn't work \u2014 double-check it and paste it again.");
+        } else {
+          paNote("Couldn't reach PurpleAir right now \u2014 using the forecast model instead.");
+        }
+      });
+    });
+
+    // Sensor data arrived alongside the forecasts, so this all happens
+    // before the first paint:
+    if (pa && pa.status === "ok") {
+      if (!applyLiveSensors(pa.sensors)) paNote("No live sensors reporting nearby right now \u2014 using the forecast model instead.");
+    } else if (pa && pa.status === "badkey") {
+      paShowSetup("The built-in PurpleAir key isn't working \u2014 it may have been disabled. Paste a fresh read key here.");
+    } else if (pa) {
+      paNote("Couldn't reach the live sensors just now \u2014 showing the forecast estimate. Pull down to refresh to try again.");
+    }
 
     // ----- 7-day daily AQI cards -----
     function renderDays() {
@@ -1011,7 +1028,6 @@
         dEl.appendChild(card);
       }
     }
-    renderDays();
 
     // ----- Hourly strip (next 24h) -----
     function renderHours() {
@@ -1034,6 +1050,9 @@
         hEl.appendChild(hour);
       }
     }
+
+    renderOutdoors();
+    renderDays();
     renderHours();
   }
 })();
