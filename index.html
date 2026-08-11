@@ -904,9 +904,14 @@
         } else {
           var wFrom = fmtHour(aT[idxs[best.start]]);
           var wTo = fmtHour(aT[idxs[best.end]]);
+          // A far-out "clean" day while we're sitting in thick smoke means the
+          // model is betting on a big change — flag it so nobody plans blind.
+          var shownNow = liveAqi != null ? liveAqi : nowAqi;
+          var hedge = (di >= 2 && shownNow >= TH + 30 && minA < shownNow - 50)
+            ? " · big change predicted — re-check as it gets closer" : "";
           why = hoursBelow + " of " + idxs.length + " daytime hrs under " + TH +
                 " · best time " + (wFrom === wTo ? "around " + wFrom : wFrom + "–" + wTo) +
-                " (air down to ~" + Math.round(minA) + ")" + windTag;
+                " (air down to ~" + Math.round(minA) + ")" + windTag + hedge;
         }
         row.innerHTML =
           '<span class="when">' + outdoorDayName(date, di) + '</span>' +
