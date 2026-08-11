@@ -183,6 +183,15 @@
           <div class="detail" id="aqiAdvice"></div>
         </div>
       </div>
+      <div class="fineprint" id="liveLine" style="display:none"></div>
+      <div class="fineprint" id="paSetup" style="display:none">
+        Want this number to come <b>live from the PurpleAir sensors near us</b> (the same purple map we use)?
+        <a href="https://develop.purpleair.com/" target="_blank" rel="noopener" style="color:var(--accent)">Create a free API read key</a>, then paste it here once — this phone remembers it:
+        <div style="margin-top:6px; display:flex; gap:6px;">
+          <input id="paKey" placeholder="PurpleAir read key" style="flex:1; min-width:120px; background:var(--card-2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:5px 8px;">
+          <button id="paSave" style="background:var(--accent); border:0; border-radius:6px; padding:5px 14px; font-weight:700; color:#10141a; cursor:pointer;">Save</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -463,12 +472,25 @@
     e.textContent = "Couldn't load the forecast (" + err.message + "). Check your internet connection and pull to refresh.";
   });
 
+  // US EPA AQI from a PM2.5 concentration (2024 breakpoints)
+  function pm25ToAqi(c) {
+    var bp = [[0,9.0,0,50],[9.1,35.4,51,100],[35.5,55.4,101,150],
+              [55.5,125.4,151,200],[125.5,225.4,201,300],[225.5,500.4,301,500]];
+    c = Math.max(0, c);
+    for (var i = 0; i < bp.length; i++) {
+      var b = bp[i];
+      if (c <= b[1]) return Math.round((c - b[0]) / (b[1] - b[0]) * (b[3] - b[2]) + b[2]);
+    }
+    return 500;
+  }
+
   function render(wx, air, fires) {
     el("loading").style.display = "none";
     el("app").style.display = "block";
     el("updated").textContent = "Updated " + new Date().toLocaleString("en-US", { timeZone: TZ }) + " · reopen or pull down to refresh";
 
     // ----- Current AQI -----
+    var liveAqi = null; // filled in by PurpleAir if a key is saved
     var nowAqi = Math.round(air.current.us_aqi);
     var lvl = aqiLevel(nowAqi);
     el("aqiVal").textContent = nowAqi;
@@ -635,22 +657,24 @@
 
     function renderHero(TH) {
       var he = el("heroEmoji"), hb = el("heroBig"), hs = el("heroSub");
-      if (nowAqi <= TH * 0.6) {
+      var shown = liveAqi != null ? liveAqi : nowAqi;
+      var src = liveAqi != null ? " (live from the sensors near us)" : " (forecast estimate)";
+      if (shown <= TH * 0.6) {
         he.textContent = "😄"; hb.textContent = "YES — go get some fresh air!";
         hb.style.color = "#00e400";
-        hs.textContent = "The air number is " + nowAqi + ", well under our family limit of " + TH + ".";
-      } else if (nowAqi <= TH) {
+        hs.textContent = "The air number is " + shown + src + ", well under our family limit of " + TH + ".";
+      } else if (shown <= TH) {
         he.textContent = "🙂"; hb.textContent = "OK to go outside";
         hb.style.color = "#a8e05f";
-        hs.textContent = "The air number is " + nowAqi + " — under our limit of " + TH + ", but not squeaky clean.";
-      } else if (nowAqi <= TH + 40) {
+        hs.textContent = "The air number is " + shown + src + " — under our limit of " + TH + ", but not squeaky clean.";
+      } else if (shown <= TH + 40) {
         he.textContent = "😕"; hb.textContent = "Not right now — close, though";
         hb.style.color = "#ff7e00";
-        hs.textContent = "The air number is " + nowAqi + ", a bit over our limit of " + TH + ". Check the list below for a better time.";
+        hs.textContent = "The air number is " + shown + src + ", a bit over our limit of " + TH + ". Check the list below for a better time.";
       } else {
         he.textContent = "😷"; hb.textContent = "NO — indoor day";
         hb.style.color = "#ff5252";
-        hs.textContent = "The air number is " + nowAqi + ", way over our limit of " + TH + ". The list below shows our next chance.";
+        hs.textContent = "The air number is " + shown + src + ", way over our limit of " + TH + ". The list below shows our next chance.";
       }
     }
 
@@ -740,6 +764,85 @@
       }
     }
     renderOutdoors();
+
+    // ----- Live PurpleAir sensors (optional — needs a free read key) -----
+    (function setupPurpleAir() {
+      var setup = el("paSetup"), line = el("liveLine");
+      var key = null;
+      try { key = localStorage.getItem("purpleairKey"); } catch (e) {}
+
+      function note(msg) { line.style.display = "block"; line.textContent = msg; }
+      function showSetup(msg) { setup.style.display = "block"; if (msg) note(msg); }
+
+      el("paSave").addEventListener("click", function () {
+        var v = el("paKey").value.trim();
+        if (!v) return;
+        try { localStorage.setItem("purpleairKey", v); } catch (e) {}
+        setup.style.display = "none";
+        loadLive(v);
+      });
+
+      if (key) loadLive(key); else showSetup();
+
+      function loadLive(k) {
+        // Outdoor sensors within ~25 mi of Moyie Springs, reporting in the last 2 h
+        var url = "https://api.purpleair.com/v1/sensors" +
+          "?fields=" + encodeURIComponent("name,latitude,longitude,humidity,pm2.5_10minute") +
+          "&location_type=0&max_age=7200" +
+          "&nwlng=-116.65&nwlat=48.95&selng=-115.75&selat=48.55";
+        fetch(url, { headers: { "X-API-Key": k } }).then(function (r) {
+          if (r.status === 403) throw new Error("badkey");
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        }).then(function (data) {
+          var fi = {};
+          (data.fields || []).forEach(function (f, idx) { fi[f] = idx; });
+          var sensors = (data.data || []).map(function (row) {
+            var raw = row[fi["pm2.5_10minute"]];
+            if (raw == null) return null;
+            var rh = row[fi.humidity] != null ? row[fi.humidity] : 50;
+            // US EPA correction for PurpleAir sensors (Barkjohn et al.)
+            var corr = raw <= 343 ? 0.524 * raw - 0.0862 * rh + 5.75
+                                  : 0.46 * raw + 3.93e-4 * raw * raw + 2.97;
+            return {
+              name: row[fi.name],
+              dist: distMiles(LAT, LON, row[fi.latitude], row[fi.longitude]),
+              aqi: pm25ToAqi(Math.max(0, corr))
+            };
+          }).filter(Boolean).sort(function (a, b) { return a.dist - b.dist; });
+
+          if (!sensors.length) {
+            showSetup("No live sensors reporting nearby right now — using the forecast model instead.");
+            return;
+          }
+          // closer sensors count more
+          var wsum = 0, sum = 0;
+          sensors.slice(0, 5).forEach(function (s) {
+            var w = 1 / (s.dist * s.dist + 0.25);
+            wsum += w; sum += s.aqi * w;
+          });
+          liveAqi = Math.round(sum / wsum);
+
+          var lvl2 = aqiLevel(liveAqi);
+          el("aqiVal").textContent = liveAqi;
+          el("aqiBadge").style.background = lvl2.color;
+          el("aqiCat").textContent = lvl2.name;
+          el("aqiCat").style.color = lvl2.color;
+          el("aqiAdvice").textContent = lvl2.advice;
+          var n = Math.min(5, sensors.length);
+          note("📡 Live from " + n + " PurpleAir sensor" + (n > 1 ? "s" : "") + " near us (nearest: " +
+               sensors[0].name + ", " + sensors[0].dist.toFixed(1) + " mi) · the forecast model says " + nowAqi + ".");
+          renderHero(parseInt(thInput.value, 10) || 110);
+        }).catch(function (err) {
+          if (err.message === "badkey") {
+            try { localStorage.removeItem("purpleairKey"); } catch (e) {}
+            showSetup("That PurpleAir key didn't work — double-check it and paste it again.");
+          } else {
+            note("Couldn't reach PurpleAir right now — using the forecast model instead.");
+          }
+        });
+      }
+    })();
 
     // ----- 7-day daily AQI cards -----
     var daily = {};

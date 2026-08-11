@@ -19,6 +19,7 @@ A single-page web app for **Moyie Springs, Idaho** (Boundary County, 48.727°N 1
 - **[Open-Meteo](https://open-meteo.com/)** — open-source weather API:
   - [Weather Forecast API](https://open-meteo.com/en/docs) — wind speed/direction/gusts, boundary-layer height, precipitation (blend of NOAA GFS/HRRR and other national weather models).
   - [Air Quality API](https://open-meteo.com/en/docs/air-quality-api) — US AQI, PM2.5, PM10 with a 7-day forecast, based on NOAA GEFS-Aerosol and Copernicus CAMS atmospheric models (these model wildfire smoke transport).
+- **[PurpleAir](https://www.purpleair.com/)** (optional) — real-time readings from the neighborhood air sensors around Moyie Springs. Needs a free API read key from [develop.purpleair.com](https://develop.purpleair.com/): paste it once into the app and the "right now" number switches from the model estimate to live sensor data (distance-weighted average of the nearest outdoor sensors, with the US EPA correction applied — the same conversion as the PurpleAir map's "US EPA AQI" setting). The key is stored only in your browser, and the 7-day forecast still comes from the models.
 - **[NIFC WFIGS](https://data-nifc.opendata.arcgis.com/)** — the National Interagency Fire Center's live feed of active US wildfire incidents (name, location, acres, containment).
 - **[BC Wildfire Service](https://wildfiresituation.nrs.gov.bc.ca/)** — live active-fire feed for British Columbia, since Moyie Springs sits ~20 miles from the border and BC fires are a frequent smoke source.
 
