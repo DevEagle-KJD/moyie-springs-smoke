@@ -14,12 +14,17 @@ A single-page web app for **Moyie Springs, Idaho** (Boundary County, 48.727°N 1
 - **7-day air quality prediction** — daily peak AQI forecast, plus each day's dominant wind direction and max wind speed.
 - **Next 24 hours** — hour-by-hour AQI and wind strip.
 
-## Data source (free & open source)
+## Data sources (all free & open, no API keys)
 
-All data comes from **[Open-Meteo](https://open-meteo.com/)** — an open-source weather API that is free for non-commercial use and requires **no API key**:
+- **[Open-Meteo](https://open-meteo.com/)** — open-source weather API:
+  - [Weather Forecast API](https://open-meteo.com/en/docs) — wind speed/direction/gusts, boundary-layer height, precipitation (blend of NOAA GFS/HRRR and other national weather models).
+  - [Air Quality API](https://open-meteo.com/en/docs/air-quality-api) — US AQI, PM2.5, PM10 with a 7-day forecast, based on NOAA GEFS-Aerosol and Copernicus CAMS atmospheric models (these model wildfire smoke transport).
+- **[NIFC WFIGS](https://data-nifc.opendata.arcgis.com/)** — the National Interagency Fire Center's live feed of active US wildfire incidents (name, location, acres, containment).
+- **[BC Wildfire Service](https://wildfiresituation.nrs.gov.bc.ca/)** — live active-fire feed for British Columbia, since Moyie Springs sits ~20 miles from the border and BC fires are a frequent smoke source.
 
-- [Weather Forecast API](https://open-meteo.com/en/docs) — wind speed/direction/gusts, boundary-layer height, precipitation (blend of NOAA GFS/HRRR and other national weather models).
-- [Air Quality API](https://open-meteo.com/en/docs/air-quality-api) — US AQI, PM2.5, PM10 with a 7-day forecast, based on NOAA GEFS-Aerosol and Copernicus CAMS atmospheric models (these model wildfire smoke transport).
+### Where's-the-smoke-from logic
+
+The app pulls every active fire of 100+ acres within ~300 miles (US + BC), computes each fire's compass bearing and distance from Moyie Springs, and weighs it by `acres ÷ distance²`. A fire is "upwind" when its bearing is within ~50° of the direction the wind is blowing **from**. Each day of the forecast gets a tag: 🍃 wind from a direction with no big fires, 🌫️ some fires that way, or 🔥 wind straight from fire country — so you can see at a glance when a wind shift should bring clean air, which is usually what opens the door to getting outside.
 
 No build step, no dependencies, no keys. The page calls the APIs directly from your browser.
 
