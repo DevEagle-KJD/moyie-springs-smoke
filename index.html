@@ -385,6 +385,103 @@
     });
   }
 
+  // Towns across the region, used to say what city each fire is near.
+  // [name, lat, lon] — coordinates approximate (within a couple miles).
+  var TOWNS = [
+    // North Idaho
+    ["Moyie Springs, ID",48.727,-116.19],["Bonners Ferry, ID",48.69,-116.316],["Naples, ID",48.57,-116.40],
+    ["Sandpoint, ID",48.276,-116.553],["Clark Fork, ID",48.15,-116.18],["Hope, ID",48.25,-116.30],
+    ["Priest River, ID",48.18,-116.90],["Coolin, ID",48.47,-116.85],["Nordman, ID",48.63,-116.94],
+    ["Athol, ID",47.95,-116.71],["Rathdrum, ID",47.81,-116.90],["Hayden, ID",47.77,-116.79],
+    ["Coeur d'Alene, ID",47.678,-116.78],["Post Falls, ID",47.71,-116.95],["Harrison, ID",47.45,-116.78],
+    ["Plummer, ID",47.33,-116.89],["St. Maries, ID",47.314,-116.562],["Avery, ID",47.25,-115.81],
+    ["Kellogg, ID",47.538,-116.12],["Wallace, ID",47.474,-115.928],["Mullan, ID",47.47,-115.80],
+    ["Moscow, ID",46.732,-117.00],["Potlatch, ID",46.92,-116.90],["Orofino, ID",46.479,-116.255],
+    ["Pierce, ID",46.49,-115.80],["Weippe, ID",46.38,-115.93],["Kamiah, ID",46.23,-116.03],
+    ["Kooskia, ID",46.14,-115.97],["Grangeville, ID",45.926,-116.12],["Elk City, ID",45.82,-115.43],
+    ["Lewiston, ID",46.416,-117.017],["White Bird, ID",45.76,-116.30],["Cottonwood, ID",46.05,-116.35],
+    // Eastern Washington
+    ["Spokane, WA",47.659,-117.426],["Deer Park, WA",47.95,-117.48],["Colville, WA",48.546,-117.905],
+    ["Kettle Falls, WA",48.61,-118.06],["Republic, WA",48.648,-118.738],["Northport, WA",48.92,-117.78],
+    ["Metaline Falls, WA",48.86,-117.37],["Ione, WA",48.74,-117.42],["Newport, WA",48.18,-117.04],
+    ["Chewelah, WA",48.276,-117.715],["Davenport, WA",47.65,-118.15],["Grand Coulee, WA",47.94,-119.00],
+    ["Omak, WA",48.41,-119.53],["Okanogan, WA",48.36,-119.58],["Tonasket, WA",48.705,-119.44],
+    ["Oroville, WA",48.94,-119.435],["Winthrop, WA",48.477,-120.186],["Twisp, WA",48.365,-120.12],
+    ["Pateros, WA",48.05,-119.90],["Chelan, WA",47.84,-120.02],["Wenatchee, WA",47.423,-120.31],
+    ["Leavenworth, WA",47.596,-120.66],["Cle Elum, WA",47.195,-120.94],["Ellensburg, WA",46.997,-120.55],
+    ["Ephrata, WA",47.32,-119.55],["Moses Lake, WA",47.13,-119.28],["Ritzville, WA",47.13,-118.38],
+    ["Cheney, WA",47.49,-117.58],["Pullman, WA",46.73,-117.18],["Colfax, WA",46.88,-117.36],
+    ["Walla Walla, WA",46.065,-118.343],["Dayton, WA",46.32,-117.97],["Pomeroy, WA",46.47,-117.60],
+    ["Clarkston, WA",46.416,-117.045],["Yakima, WA",46.60,-120.51],["Naches, WA",46.73,-120.70],
+    ["Richland, WA",46.28,-119.28],["Kennewick, WA",46.21,-119.14],
+    // Western Montana
+    ["Yaak, MT",48.85,-115.71],["Troy, MT",48.463,-115.888],["Libby, MT",48.388,-115.556],
+    ["Eureka, MT",48.88,-115.05],["Whitefish, MT",48.411,-114.338],["Columbia Falls, MT",48.372,-114.18],
+    ["West Glacier, MT",48.50,-113.98],["East Glacier Park, MT",48.44,-113.22],["Kalispell, MT",48.197,-114.313],
+    ["Bigfork, MT",48.063,-114.073],["Lakeside, MT",47.99,-114.22],["Polson, MT",47.694,-114.163],
+    ["Ronan, MT",47.529,-114.101],["St. Ignatius, MT",47.32,-114.10],["Arlee, MT",47.17,-114.08],
+    ["Hot Springs, MT",47.61,-114.67],["Plains, MT",47.46,-114.883],["Thompson Falls, MT",47.595,-115.348],
+    ["Trout Creek, MT",47.85,-115.60],["Noxon, MT",48.01,-115.77],["Heron, MT",48.06,-115.96],
+    ["Superior, MT",47.192,-114.892],["St. Regis, MT",47.30,-115.10],["Alberton, MT",47.00,-114.49],
+    ["Frenchtown, MT",47.02,-114.23],["Missoula, MT",46.872,-113.994],["Lolo, MT",46.76,-114.08],
+    ["Stevensville, MT",46.51,-114.09],["Hamilton, MT",46.247,-114.16],["Darby, MT",46.02,-114.18],
+    ["Sula, MT",45.85,-113.98],["Seeley Lake, MT",47.18,-113.48],["Condon, MT",47.54,-113.72],
+    ["Ovando, MT",47.02,-113.13],["Lincoln, MT",46.955,-112.682],["Drummond, MT",46.67,-113.15],
+    ["Philipsburg, MT",46.332,-113.294],["Anaconda, MT",46.128,-112.942],["Butte, MT",46.004,-112.535],
+    ["Whitehall, MT",45.87,-112.10],["Boulder, MT",46.24,-112.12],["Helena, MT",46.589,-112.039],
+    ["Townsend, MT",46.32,-111.52],["Great Falls, MT",47.506,-111.30],["Cascade, MT",47.27,-111.70],
+    ["Choteau, MT",47.813,-112.183],["Augusta, MT",47.49,-112.39],["Conrad, MT",48.17,-111.95],
+    ["Shelby, MT",48.505,-111.857],["Cut Bank, MT",48.633,-112.326],["Browning, MT",48.557,-113.013],
+    ["Deer Lodge, MT",46.396,-112.73],["Three Forks, MT",45.89,-111.55],["Bozeman, MT",45.677,-111.043],
+    ["Belgrade, MT",45.78,-111.18],["Wisdom, MT",45.62,-113.45],["Wise River, MT",45.79,-112.96],
+    // Southern British Columbia
+    ["Yahk, BC",49.085,-116.09],["Kingsgate, BC",49.00,-116.18],["Moyie, BC",49.283,-115.837],
+    ["Cranbrook, BC",49.512,-115.769],["Kimberley, BC",49.67,-115.978],["Fort Steele, BC",49.62,-115.63],
+    ["Wasa, BC",49.79,-115.73],["Jaffray, BC",49.37,-115.36],["Elko, BC",49.30,-115.11],
+    ["Fernie, BC",49.504,-115.063],["Sparwood, BC",49.733,-114.885],["Elkford, BC",50.02,-114.92],
+    ["Canal Flats, BC",50.15,-115.82],["Fairmont Hot Springs, BC",50.34,-115.85],["Invermere, BC",50.506,-116.03],
+    ["Radium Hot Springs, BC",50.62,-116.08],["Golden, BC",51.30,-116.96],["Creston, BC",49.096,-116.514],
+    ["Boswell, BC",49.47,-116.76],["Crawford Bay, BC",49.66,-116.82],["Riondel, BC",49.77,-116.85],
+    ["Kaslo, BC",49.913,-116.911],["Balfour, BC",49.63,-116.97],["Nelson, BC",49.494,-117.294],
+    ["Salmo, BC",49.194,-117.28],["Ymir, BC",49.28,-117.22],["Fruitvale, BC",49.114,-117.548],
+    ["Trail, BC",49.096,-117.71],["Rossland, BC",49.078,-117.80],["Castlegar, BC",49.325,-117.659],
+    ["Slocan, BC",49.77,-117.47],["New Denver, BC",49.99,-117.37],["Nakusp, BC",50.24,-117.80],
+    ["Fauquier, BC",49.87,-118.07],["Grand Forks, BC",49.03,-118.44],["Christina Lake, BC",49.06,-118.23],
+    ["Greenwood, BC",49.10,-118.68],["Midway, BC",49.01,-118.77],["Rock Creek, BC",49.06,-119.02],
+    ["Beaverdell, BC",49.44,-119.09],["Osoyoos, BC",49.032,-119.468],["Oliver, BC",49.183,-119.55],
+    ["Okanagan Falls, BC",49.34,-119.57],["Penticton, BC",49.499,-119.594],["Summerland, BC",49.60,-119.68],
+    ["Peachland, BC",49.77,-119.74],["West Kelowna, BC",49.86,-119.58],["Kelowna, BC",49.888,-119.496],
+    ["Lake Country, BC",50.05,-119.41],["Vernon, BC",50.267,-119.272],["Lumby, BC",50.25,-118.97],
+    ["Cherryville, BC",50.23,-118.62],["Armstrong, BC",50.45,-119.20],["Enderby, BC",50.55,-119.14],
+    ["Salmon Arm, BC",50.70,-119.284],["Sicamous, BC",50.836,-118.98],["Revelstoke, BC",50.998,-118.196],
+    ["Kamloops, BC",50.676,-120.34],["Chase, BC",50.82,-119.69],["Barriere, BC",51.18,-120.12],
+    ["Merritt, BC",50.112,-120.79],["Logan Lake, BC",50.49,-120.81],["Princeton, BC",49.459,-120.506],
+    ["Hedley, BC",49.36,-120.07],["Keremeos, BC",49.20,-119.83],["Ashcroft, BC",50.725,-121.28],
+    // Southwest Alberta
+    ["Calgary, AB",51.045,-114.058],["Cochrane, AB",51.19,-114.47],["Canmore, AB",51.089,-115.359],
+    ["Banff, AB",51.178,-115.571],["Lake Louise, AB",51.43,-116.18],["Okotoks, AB",50.73,-113.98],
+    ["High River, AB",50.58,-113.87],["Nanton, AB",50.35,-113.77],["Claresholm, AB",50.02,-113.58],
+    ["Fort Macleod, AB",49.72,-113.40],["Pincher Creek, AB",49.486,-113.95],["Crowsnest Pass, AB",49.60,-114.43],
+    ["Waterton Park, AB",49.05,-113.91],["Cardston, AB",49.20,-113.30],["Lethbridge, AB",49.694,-112.833],
+    ["Taber, AB",49.79,-112.15],["Vulcan, AB",50.40,-113.26],["Bragg Creek, AB",50.95,-114.57],
+    // Northeast Oregon
+    ["Pendleton, OR",45.672,-118.789],["Hermiston, OR",45.84,-119.29],["Milton-Freewater, OR",45.93,-118.39],
+    ["Umatilla, OR",45.92,-119.34],["Boardman, OR",45.84,-119.70],["Elgin, OR",45.56,-117.92],
+    ["Wallowa, OR",45.57,-117.53],["Imnaha, OR",45.56,-116.83]
+  ];
+  function nearestTown(lat, lon) {
+    var best = null, bestD = Infinity;
+    for (var i = 0; i < TOWNS.length; i++) {
+      var d = distMiles(lat, lon, TOWNS[i][1], TOWNS[i][2]);
+      if (d < bestD) { bestD = d; best = TOWNS[i][0]; }
+    }
+    return { name: best, dist: bestD };
+  }
+  function townLabel(t) {
+    if (!t || !t.name) return "";
+    return t.dist <= 12 ? "near " + t.name : Math.round(t.dist) + " mi from " + t.name;
+  }
+
   // ---- Fire feeds (each optional — the app still works if one is down) ----
   function parseUsFires(data) {
     if (!data || data.error || !data.features) return [];
@@ -438,6 +535,7 @@
       fires.forEach(function (fi) {
         fi.distMi = distMiles(LAT, LON, fi.lat, fi.lon);
         fi.bearing = bearingTo(LAT, LON, fi.lat, fi.lon);
+        fi.town = nearestTown(fi.lat, fi.lon);
         // How much smoke this fire can send us: bigger + closer = worse
         fi.impact = fi.acres / Math.max(fi.distMi * fi.distMi, 25);
       });
@@ -560,7 +658,8 @@
         var d = document.createElement("div");
         d.className = "fire";
         var contTxt = fi.contained != null ? " · " + Math.round(fi.contained) + "% contained" : "";
-        d.innerHTML = '<span class="fname">🔥 ' + fi.name + '</span>' +
+        var townTxt = townLabel(fi.town);
+        d.innerHTML = '<span class="fname">🔥 ' + fi.name + (townTxt ? ' <span style="font-weight:400;color:var(--muted)">(' + townTxt + ')</span>' : '') + '</span>' +
           '<span class="fmeta">' + Math.round(fi.distMi) + " mi " + dirName(fi.bearing) + " of us · " +
           Math.round(fi.acres).toLocaleString() + " acres" + contTxt + "</span>";
         upwindEl.appendChild(d);
