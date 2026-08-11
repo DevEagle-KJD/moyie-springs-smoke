@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moyie Springs Smoke &amp; Air Quality</title>
+<style>
+  :root {
+    --bg: #0f1620;
+    --card: #1a2432;
+    --card-2: #212e40;
+    --text: #e8eef5;
+    --muted: #93a4b8;
+    --accent: #4fc3f7;
+    --border: #2b3b50;
+    --good: #00e400;
+    --moderate: #ffff00;
+    --usg: #ff7e00;
+    --unhealthy: #ff0000;
+    --very-unhealthy: #8f3f97;
+    --hazardous: #7e0023;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    padding: 16px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  header { text-align: center; margin: 12px 0 24px; }
+  header h1 { font-size: 1.6rem; font-weight: 700; }
+  header .sub { color: var(--muted); font-size: 0.95rem; margin-top: 4px; }
+  .updated { color: var(--muted); font-size: 0.8rem; text-align: center; margin-bottom: 16px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+  }
+  .card h2 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* Current AQI */
+  .aqi-now { display: flex; align-items: center; gap: 18px; }
+  .aqi-badge {
+    width: 96px; height: 96px; border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 2rem; color: #10141a;
+    flex-shrink: 0;
+  }
+  .aqi-badge small { font-size: 0.6rem; font-weight: 600; }
+  .aqi-meta .cat { font-size: 1.15rem; font-weight: 700; }
+  .aqi-meta .detail { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+
+  /* Wind compass */
+  .wind-now { display: flex; align-items: center; gap: 18px; }
+  .compass { width: 110px; height: 110px; flex-shrink: 0; }
+  .wind-meta .big { font-size: 1.5rem; font-weight: 700; }
+  .wind-meta .detail { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+
+  /* Smoke outlook */
+  .outlook-headline {
+    font-size: 1.2rem; font-weight: 700; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .outlook-headline .dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+  .outlook-text { color: var(--muted); font-size: 0.95rem; }
+  .windows { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .window-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--card-2); border-radius: 10px; padding: 10px 14px;
+    font-size: 0.9rem; gap: 10px; flex-wrap: wrap;
+  }
+  .window-row .when { font-weight: 600; }
+  .window-row .why { color: var(--muted); font-size: 0.82rem; }
+  .pill {
+    padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700;
+    color: #10141a; white-space: nowrap;
+  }
+
+  /* 7-day forecast */
+  .days {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+    gap: 10px;
+  }
+  .day {
+    background: var(--card-2); border-radius: 12px; padding: 12px 10px;
+    text-align: center; border-top: 4px solid transparent;
+  }
+  .day .dname { font-weight: 700; font-size: 0.9rem; }
+  .day .ddate { color: var(--muted); font-size: 0.75rem; margin-bottom: 8px; }
+  .day .daqi { font-size: 1.7rem; font-weight: 800; }
+  .day .dcat { font-size: 0.72rem; font-weight: 600; margin-bottom: 8px; }
+  .day .dwind { color: var(--muted); font-size: 0.78rem; border-top: 1px solid var(--border); padding-top: 6px; margin-top: 4px; }
+  .day .arrow { display: inline-block; font-size: 1rem; }
+
+  /* Hourly strip */
+  .hours { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 8px; }
+  .hour {
+    min-width: 72px; background: var(--card-2); border-radius: 10px;
+    padding: 10px 6px; text-align: center; font-size: 0.78rem; flex-shrink: 0;
+  }
+  .hour .h { color: var(--muted); }
+  .hour .haqi { font-weight: 800; font-size: 1.05rem; margin: 4px 0; border-radius: 6px; color:#10141a; }
+  .hour .hw { color: var(--muted); }
+  .hour .harrow { font-size: 1.1rem; display:block; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 14px; font-size: 0.75rem; color: var(--muted); }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  footer { color: var(--muted); font-size: 0.78rem; text-align: center; margin: 26px 0 10px; }
+  footer a { color: var(--accent); }
+  .error {
+    background: #3a1c1c; border: 1px solid #6e2c2c; color: #ffb3b3;
+    border-radius: 10px; padding: 14px; margin-bottom: 16px; display: none;
+  }
+  .loading { text-align: center; color: var(--muted); padding: 40px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌲 Moyie Springs Smoke &amp; Air Quality</h1>
+  <div class="sub">Boundary County, Idaho &middot; 48.727°N, 116.190°W &middot; wind, smoke-clearing outlook &amp; 7-day AQI forecast</div>
+</header>
+<div class="updated" id="updated">Loading&hellip;</div>
+<div class="error" id="error"></div>
+<div class="loading" id="loading">Fetching the latest data from Open-Meteo&hellip;</div>
+
+<div id="app" style="display:none">
+
+  <div class="grid">
+    <div class="card">
+      <h2>Air Quality Right Now</h2>
+      <div class="aqi-now">
+        <div class="aqi-badge" id="aqiBadge"><span id="aqiVal">–</span><small>US AQI</small></div>
+        <div class="aqi-meta">
+          <div class="cat" id="aqiCat">–</div>
+          <div class="detail" id="aqiDetail">–</div>
+          <div class="detail" id="aqiAdvice"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Wind Right Now</h2>
+      <div class="wind-now">
+        <svg class="compass" id="compass" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="46" fill="none" stroke="#2b3b50" stroke-width="2"/>
+          <text x="50" y="13" text-anchor="middle" fill="#93a4b8" font-size="9">N</text>
+          <text x="50" y="94" text-anchor="middle" fill="#93a4b8" font-size="9">S</text>
+          <text x="91" y="53" text-anchor="middle" fill="#93a4b8" font-size="9">E</text>
+          <text x="9" y="53" text-anchor="middle" fill="#93a4b8" font-size="9">W</text>
+          <g id="needle" transform="rotate(0 50 50)">
+            <polygon points="50,20 45,58 50,52 55,58" fill="#4fc3f7"/>
+          </g>
+          <circle cx="50" cy="50" r="4" fill="#4fc3f7"/>
+        </svg>
+        <div class="wind-meta">
+          <div class="big" id="windNow">–</div>
+          <div class="detail" id="windFrom">–</div>
+          <div class="detail" id="windGust">–</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h2>💨 Smoke-Clearing Outlook</h2>
+    <div class="outlook-headline"><span class="dot" id="outlookDot"></span><span id="outlookHead">–</span></div>
+    <div class="outlook-text" id="outlookText">–</div>
+    <div class="windows" id="windows"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h2>📅 7-Day Air Quality Prediction</h2>
+    <div class="days" id="days"></div>
+    <div class="legend">
+      <span><i style="background:var(--good)"></i>Good 0–50</span>
+      <span><i style="background:var(--moderate)"></i>Moderate 51–100</span>
+      <span><i style="background:var(--usg)"></i>Unhealthy for Sensitive 101–150</span>
+      <span><i style="background:var(--unhealthy)"></i>Unhealthy 151–200</span>
+      <span><i style="background:var(--very-unhealthy)"></i>Very Unhealthy 201–300</span>
+      <span><i style="background:var(--hazardous)"></i>Hazardous 301+</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🕐 Next 24 Hours — AQI &amp; Wind (arrows show where wind is blowing toward)</h2>
+    <div class="hours" id="hours"></div>
+  </div>
+
+</div>
+
+<footer>
+  Data: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (free &amp; open-source) —
+  air quality from NOAA GEFS-Aerosol &amp; Copernicus CAMS models, weather from national weather model blend.
+  Forecasts are model predictions, not measurements; during active fires conditions can change fast.
+  Not medical advice.
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var LAT = 48.7266, LON = -116.1902, TZ = "America/Los_Angeles";
+
+  var WEATHER_URL = "https://api.open-meteo.com/v1/forecast" +
+    "?latitude=" + LAT + "&longitude=" + LON +
+    "&current=temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m" +
+    "&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,boundary_layer_height,precipitation" +
+    "&daily=wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,precipitation_sum" +
+    "&wind_speed_unit=mph&temperature_unit=fahrenheit" +
+    "&timezone=" + encodeURIComponent(TZ) + "&forecast_days=7";
+
+  var AIR_URL = "https://air-quality-api.open-meteo.com/v1/air-quality" +
+    "?latitude=" + LAT + "&longitude=" + LON +
+    "&current=us_aqi,pm2_5,pm10" +
+    "&hourly=us_aqi,pm2_5,pm10" +
+    "&timezone=" + encodeURIComponent(TZ) + "&forecast_days=7";
+
+  var AQI_LEVELS = [
+    { max: 50,  name: "Good",                            color: "#00e400", advice: "Air is clean — great day to be outside." },
+    { max: 100, name: "Moderate",                        color: "#ffff00", advice: "OK for most people; unusually sensitive folks should take it easy." },
+    { max: 150, name: "Unhealthy for Sensitive Groups",  color: "#ff7e00", advice: "Kids, seniors, and people with asthma/heart issues should limit time outdoors." },
+    { max: 200, name: "Unhealthy",                       color: "#ff0000", advice: "Everyone should cut back on outdoor exertion." },
+    { max: 300, name: "Very Unhealthy",                  color: "#8f3f97", advice: "Avoid outdoor activity; run a HEPA filter indoors if you have one." },
+    { max: Infinity, name: "Hazardous",                  color: "#7e0023", advice: "Stay indoors with filtered air. Health warnings for everyone." }
+  ];
+
+  function aqiLevel(aqi) {
+    for (var i = 0; i < AQI_LEVELS.length; i++) {
+      if (aqi <= AQI_LEVELS[i].max) return AQI_LEVELS[i];
+    }
+    return AQI_LEVELS[AQI_LEVELS.length - 1];
+  }
+
+  var DIRS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+  function dirName(deg) { return DIRS[Math.round(deg / 22.5) % 16]; }
+  // Arrow pointing where the wind is blowing TOWARD (met. direction is where it comes FROM)
+  function dirArrow(fromDeg) {
+    var toDeg = (fromDeg + 180) % 360;
+    var arrows = ["↑","↗","→","↘","↓","↙","←","↖"];
+    return arrows[Math.round(toDeg / 45) % 8];
+  }
+
+  // Ventilation quality: wind speed (mph) x boundary layer height (m).
+  // Higher = smoke mixes up and blows out of the valley faster.
+  // Thresholds adapted from NWS ventilation-rate categories.
+  function ventScore(windMph, blhM, precipMm) {
+    var score = 0;
+    if (blhM != null) {
+      var vent = (windMph * 0.447) * blhM; // m2/s
+      if (vent >= 4700) score = 3;        // good
+      else if (vent >= 2350) score = 2;   // fair
+      else if (vent >= 1175) score = 1;   // marginal
+    } else {
+      // no mixing-height data — score on wind speed alone
+      if (windMph >= 13) score = 3;
+      else if (windMph >= 9) score = 2;
+      else if (windMph >= 6) score = 1;
+    }
+    if (precipMm >= 0.5) score = Math.min(3, score + 1); // rain scrubs smoke
+    return score;
+  }
+  var VENT_LABELS = ["Poor — smoke likely lingers", "Marginal", "Fair — some clearing", "Good — smoke should blow out"];
+  var VENT_COLORS = ["#ff7e00", "#ffff00", "#a8e05f", "#00e400"];
+
+  function fmtHour(iso) {
+    var h = parseInt(iso.slice(11, 13), 10);
+    var ampm = h >= 12 ? "pm" : "am";
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ampm;
+  }
+  function dayLabel(iso, idx) {
+    if (idx === 0) return "Today";
+    if (idx === 1) return "Tomorrow";
+    var d = new Date(iso + "T12:00:00");
+    return d.toLocaleDateString("en-US", { weekday: "short" });
+  }
+  function dateLabel(iso) {
+    var d = new Date(iso + "T12:00:00");
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+
+  function el(id) { return document.getElementById(id); }
+
+  function fetchJSON(url) {
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status + " from " + url.split("?")[0]);
+      return r.json();
+    });
+  }
+
+  // If boundary_layer_height is ever rejected by the API, retry without it.
+  function fetchWeather() {
+    return fetchJSON(WEATHER_URL).catch(function () {
+      return fetchJSON(WEATHER_URL.replace(",boundary_layer_height", ""));
+    });
+  }
+
+  Promise.all([fetchWeather(), fetchJSON(AIR_URL)]).then(function (results) {
+    render(results[0], results[1]);
+  }).catch(function (err) {
+    el("loading").style.display = "none";
+    var e = el("error");
+    e.style.display = "block";
+    e.textContent = "Couldn't load forecast data (" + err.message + "). Check your internet connection and refresh.";
+  });
+
+  function render(wx, air) {
+    el("loading").style.display = "none";
+    el("app").style.display = "block";
+    el("updated").textContent = "Updated " + new Date().toLocaleString("en-US", { timeZone: TZ }) + " (Pacific) · refresh page for latest";
+
+    // ----- Current AQI -----
+    var nowAqi = Math.round(air.current.us_aqi);
+    var lvl = aqiLevel(nowAqi);
+    el("aqiVal").textContent = nowAqi;
+    el("aqiBadge").style.background = lvl.color;
+    el("aqiCat").textContent = lvl.name;
+    el("aqiCat").style.color = lvl.color;
+    var pm25 = air.current.pm2_5, pm10 = air.current.pm10;
+    el("aqiDetail").textContent = "PM2.5: " + (pm25 != null ? pm25.toFixed(1) : "–") + " µg/m³ · PM10: " + (pm10 != null ? pm10.toFixed(1) : "–") + " µg/m³";
+    el("aqiAdvice").textContent = lvl.advice;
+
+    // ----- Current wind -----
+    var ws = wx.current.wind_speed_10m, wd = wx.current.wind_direction_10m, wg = wx.current.wind_gusts_10m;
+    el("windNow").textContent = Math.round(ws) + " mph " + dirName(wd);
+    el("windFrom").textContent = "Blowing from the " + dirName(wd) + " (" + Math.round(wd) + "°) toward the " + dirName((wd + 180) % 360);
+    el("windGust").textContent = "Gusts to " + Math.round(wg) + " mph · " + Math.round(wx.current.temperature_2m) + "°F";
+    el("needle").setAttribute("transform", "rotate(" + ((wd + 180) % 360) + " 50 50)");
+
+    // ----- Hourly arrays -----
+    var hT = wx.hourly.time, hWs = wx.hourly.wind_speed_10m, hWd = wx.hourly.wind_direction_10m,
+        hBlh = wx.hourly.boundary_layer_height, hPr = wx.hourly.precipitation;
+    var aT = air.hourly.time, aAqi = air.hourly.us_aqi;
+    var aqiByTime = {};
+    for (var i = 0; i < aT.length; i++) aqiByTime[aT[i]] = aAqi[i];
+
+    // find current hour index in weather hourly
+    var nowIso = wx.current.time.slice(0, 13);
+    var startIdx = 0;
+    for (i = 0; i < hT.length; i++) { if (hT[i].slice(0, 13) >= nowIso) { startIdx = i; break; } }
+
+    // ----- Smoke-clearing outlook: scan next 48h for good ventilation windows -----
+    var windows = [];
+    var cur = null;
+    for (i = startIdx; i < Math.min(startIdx + 48, hT.length); i++) {
+      var s = ventScore(hWs[i], hBlh ? hBlh[i] : null, hPr[i] || 0);
+      if (s >= 2) {
+        if (!cur) cur = { from: i, to: i, best: s, peakWind: hWs[i], dir: hWd[i] };
+        else { cur.to = i; cur.best = Math.max(cur.best, s); if (hWs[i] > cur.peakWind) { cur.peakWind = hWs[i]; cur.dir = hWd[i]; } }
+      } else if (cur) { windows.push(cur); cur = null; }
+    }
+    if (cur) windows.push(cur);
+
+    var nowScore = ventScore(hWs[startIdx], hBlh ? hBlh[startIdx] : null, hPr[startIdx] || 0);
+    el("outlookDot").style.background = VENT_COLORS[nowScore];
+    el("outlookHead").textContent = "Right now: " + VENT_LABELS[nowScore];
+
+    // AQI trend over next 24h
+    var aqiNow24 = [], aqiLater24 = [];
+    for (i = 0; i < aT.length; i++) {
+      if (aT[i].slice(0, 13) >= nowIso) {
+        if (aqiNow24.length < 12) aqiNow24.push(aAqi[i]);
+        else if (aqiLater24.length < 12) aqiLater24.push(aAqi[i]);
+      }
+    }
+    function avg(arr) { return arr.length ? arr.reduce(function (a, b) { return a + b; }, 0) / arr.length : 0; }
+    var trend = avg(aqiLater24) - avg(aqiNow24);
+    var trendTxt = Math.abs(trend) < 5 ? "The AQI forecast is roughly steady over the next 24 hours."
+      : trend < 0 ? "The AQI forecast is improving over the next 24 hours (about " + Math.abs(Math.round(trend)) + " points better)."
+      : "Heads up: the AQI forecast worsens over the next 24 hours (about " + Math.round(trend) + " points higher).";
+    el("outlookText").textContent =
+      "Smoke clears fastest when winds are strong and the atmosphere mixes deeply (usually warm afternoons), or when it rains. " + trendTxt;
+
+    var wEl = el("windows");
+    wEl.innerHTML = "";
+    if (windows.length === 0) {
+      var row = document.createElement("div");
+      row.className = "window-row";
+      row.innerHTML = '<span class="when">No strong clearing windows in the next 48 hours</span><span class="why">Light winds and a stable atmosphere — smoke that\'s here will hang around.</span>';
+      wEl.appendChild(row);
+    } else {
+      windows.slice(0, 4).forEach(function (w) {
+        var row = document.createElement("div");
+        row.className = "window-row";
+        row.innerHTML =
+          '<span class="when">' + hourWindowLabel(hT[w.from], hT[w.to]) + '</span>' +
+          '<span class="why">Wind up to ' + Math.round(w.peakWind) + ' mph from the ' + dirName(w.dir) + '</span>' +
+          '<span class="pill" style="background:' + VENT_COLORS[w.best] + '">' + (w.best >= 3 ? "GOOD CLEARING" : "FAIR CLEARING") + '</span>';
+        wEl.appendChild(row);
+      });
+    }
+
+    function dayLabel2(iso) {
+      var d = new Date(iso.slice(0, 10) + "T12:00:00");
+      return d.toLocaleDateString("en-US", { weekday: "short" }) + " ";
+    }
+    function hourWindowLabel(fromIso, toIso) {
+      var today = hT[startIdx].slice(0, 10);
+      function lbl(iso) {
+        var day = iso.slice(0, 10);
+        var prefix = day === today ? "Today" : new Date(day + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" });
+        return prefix + " " + fmtHour(iso);
+      }
+      var toLbl = lbl(toIso);
+      if (toIso.slice(0, 10) === fromIso.slice(0, 10)) toLbl = fmtHour(toIso);
+      return lbl(fromIso) + " → " + toLbl;
+    }
+
+    // ----- 7-day daily AQI prediction -----
+    var daily = {}; // date -> {peak, sum, n}
+    for (i = 0; i < aT.length; i++) {
+      var day = aT[i].slice(0, 10);
+      if (!daily[day]) daily[day] = { peak: 0, sum: 0, n: 0 };
+      if (aAqi[i] != null) {
+        daily[day].peak = Math.max(daily[day].peak, aAqi[i]);
+        daily[day].sum += aAqi[i]; daily[day].n++;
+      }
+    }
+    var dEl = el("days");
+    dEl.innerHTML = "";
+    var dDates = wx.daily.time;
+    for (i = 0; i < dDates.length; i++) {
+      var date = dDates[i];
+      var d = daily[date];
+      if (!d || !d.n) continue;
+      var peak = Math.round(d.peak);
+      var lv = aqiLevel(peak);
+      var card = document.createElement("div");
+      card.className = "day";
+      card.style.borderTopColor = lv.color;
+      card.innerHTML =
+        '<div class="dname">' + dayLabel(date, i) + '</div>' +
+        '<div class="ddate">' + dateLabel(date) + '</div>' +
+        '<div class="daqi" style="color:' + lv.color + '">' + peak + '</div>' +
+        '<div class="dcat" style="color:' + lv.color + '">' + lv.name.replace("Unhealthy for Sensitive Groups", "Sensitive Groups") + '</div>' +
+        '<div class="dwind"><span class="arrow">' + dirArrow(wx.daily.wind_direction_10m_dominant[i]) + '</span> ' +
+          dirName(wx.daily.wind_direction_10m_dominant[i]) + ' ' + Math.round(wx.daily.wind_speed_10m_max[i]) + ' mph' +
+          (wx.daily.precipitation_sum[i] >= 0.5 ? ' · 🌧️' : '') + '</div>';
+      dEl.appendChild(card);
+    }
+
+    // ----- Hourly strip (next 24h) -----
+    var hEl = el("hours");
+    hEl.innerHTML = "";
+    for (i = startIdx; i < Math.min(startIdx + 24, hT.length); i++) {
+      var t = hT[i];
+      var a = aqiByTime[t];
+      var lvh = a != null ? aqiLevel(Math.round(a)) : null;
+      var hour = document.createElement("div");
+      hour.className = "hour";
+      hour.innerHTML =
+        '<div class="h">' + (t.slice(0, 10) !== hT[startIdx].slice(0, 10) && fmtHour(t) === "12am" ? dayLabel2(t) : "") + fmtHour(t) + '</div>' +
+        '<div class="haqi" style="background:' + (lvh ? lvh.color : "#555") + '">' + (a != null ? Math.round(a) : "–") + '</div>' +
+        '<span class="harrow">' + dirArrow(hWd[i]) + '</span>' +
+        '<div class="hw">' + Math.round(hWs[i]) + ' mph</div>';
+      hEl.appendChild(hour);
+    }
+  }
+})();
+</script>
+</body>
+</html>
