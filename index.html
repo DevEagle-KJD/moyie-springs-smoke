@@ -185,8 +185,8 @@
       </div>
       <div class="fineprint" id="liveLine" style="display:none"></div>
       <div class="fineprint" id="paSetup" style="display:none">
-        Want this number to come <b>live from the PurpleAir sensors near us</b> (the same purple map we use)?
-        <a href="https://develop.purpleair.com/" target="_blank" rel="noopener" style="color:var(--accent)">Create a free API read key</a>, then paste it here once — this phone remembers it:
+        Live sensor readings need a working PurpleAir key.
+        <a href="https://develop.purpleair.com/" target="_blank" rel="noopener" style="color:var(--accent)">Create a free read key</a> and paste it here — this phone remembers it:
         <div style="margin-top:6px; display:flex; gap:6px;">
           <input id="paKey" placeholder="PurpleAir read key" style="flex:1; min-width:120px; background:var(--card-2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:5px 8px;">
           <button id="paSave" style="background:var(--accent); border:0; border-radius:6px; padding:5px 14px; font-weight:700; color:#10141a; cursor:pointer;">Save</button>
@@ -765,11 +765,16 @@
     }
     renderOutdoors();
 
-    // ----- Live PurpleAir sensors (optional — needs a free read key) -----
+    // ----- Live PurpleAir sensors -----
+    // Family read key (rotate at develop.purpleair.com if it ever gets abused;
+    // a key pasted into the box below overrides this one on that device).
+    var DEFAULT_PA_KEY = "F0A0551A-953B-11F1-9E30-4201AC1DC129";
     (function setupPurpleAir() {
       var setup = el("paSetup"), line = el("liveLine");
       var key = null;
       try { key = localStorage.getItem("purpleairKey"); } catch (e) {}
+      var usingDefault = !key;
+      if (!key) key = DEFAULT_PA_KEY;
 
       function note(msg) { line.style.display = "block"; line.textContent = msg; }
       function showSetup(msg) { setup.style.display = "block"; if (msg) note(msg); }
@@ -782,7 +787,7 @@
         loadLive(v);
       });
 
-      if (key) loadLive(key); else showSetup();
+      loadLive(key);
 
       function loadLive(k) {
         // Outdoor sensors within ~25 mi of Moyie Springs, reporting in the last 2 h
@@ -832,8 +837,14 @@
           renderHero(parseInt(thInput.value, 10) || 110);
         }).catch(function (err) {
           if (err.message === "badkey") {
-            try { localStorage.removeItem("purpleairKey"); } catch (e) {}
-            showSetup("That PurpleAir key didn't work — double-check it and paste it again.");
+            if (!usingDefault) {
+              // a pasted key failed — clear it and fall back to the built-in one
+              try { localStorage.removeItem("purpleairKey"); } catch (e) {}
+              usingDefault = true;
+              loadLive(DEFAULT_PA_KEY);
+              return;
+            }
+            showSetup("The built-in PurpleAir key isn't working — it may have been disabled. Paste a fresh read key here.");
           } else {
             note("Couldn't reach PurpleAir right now — using the forecast model instead.");
           }
