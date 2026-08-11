@@ -943,7 +943,7 @@
       el("aqiAdvice").textContent = lvl2.advice;
       var n = Math.min(5, sensors.length);
       paNote("\ud83d\udce1 Live \u2014 a blend of " + n + " PurpleAir sensor" + (n > 1 ? "s" : "") + " around us, with the closest counting most (nearest: " +
-             sensors[0].name + ", " + sensors[0].dist.toFixed(1) + " mi) \u00b7 the forecast model says " + nowAqi + ".");
+             sensors[0].name + ", " + sensors[0].dist.toFixed(1) + " mi). For comparison, the computer forecast guessed " + nowAqi + " \u2014 we go with the real sensors.");
 
       // When the model disagrees with our sensors, nudge the next 48 h of
       // forecast toward reality (full correction now, fading to none at +48 h).
