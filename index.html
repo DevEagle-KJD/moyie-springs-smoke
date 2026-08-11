@@ -942,8 +942,14 @@
       el("aqiCat").style.color = lvl2.color;
       el("aqiAdvice").textContent = lvl2.advice;
       var n = Math.min(5, sensors.length);
-      paNote("\ud83d\udce1 Live from " + n + " PurpleAir sensor" + (n > 1 ? "s" : "") + " near us (nearest: " +
-             sensors[0].name + ", " + sensors[0].dist.toFixed(1) + " mi) \u00b7 the forecast model says " + nowAqi + ".");
+      var parts = sensors.slice(0, 4).map(function (s) {
+        var nm = String(s.name || "sensor");
+        if (nm.length > 22) nm = nm.slice(0, 21) + "\u2026";
+        return nm + " (" + s.dist.toFixed(1) + " mi): " + s.aqi;
+      });
+      paNote("\ud83d\udce1 Blend of " + n + " PurpleAir sensor" + (n > 1 ? "s" : "") + ", closest counting most \u2014 " +
+             parts.join(" \u00b7 ") + (sensors.length > 4 ? " \u00b7 +" + (sensors.length - 4) + " more" : "") +
+             ". The forecast model says " + nowAqi + ".");
 
       // When the model disagrees with our sensors, nudge the next 48 h of
       // forecast toward reality (full correction now, fading to none at +48 h).
