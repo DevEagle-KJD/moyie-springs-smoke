@@ -121,6 +121,13 @@
   .hour .hw { color: var(--muted); }
   .hour .harrow { font-size: 1.1rem; display:block; }
 
+  #thresh {
+    width: 64px; background: var(--card-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
+    font-size: 0.85rem; font-weight: 700;
+  }
+  .fineprint { color: var(--muted); font-size: 0.78rem; margin-top: 10px; }
+
   .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 14px; font-size: 0.75rem; color: var(--muted); }
   .legend span { display: flex; align-items: center; gap: 5px; }
   .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
@@ -187,6 +194,13 @@
     <div class="outlook-headline"><span class="dot" id="outlookDot"></span><span id="outlookHead">–</span></div>
     <div class="outlook-text" id="outlookText">–</div>
     <div class="windows" id="windows"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h2>🚶 Getting Outdoors — chances each day (AQI below <input type="number" id="thresh" min="20" max="300" step="5"> )</h2>
+    <div class="outlook-headline"><span class="dot" id="outdoorDot"></span><span id="outdoorHead">–</span></div>
+    <div class="windows" id="outdoorDays"></div>
+    <div class="fineprint">Counts daytime hours (7am–9pm) the forecast puts below your AQI limit. Days 4–7 are lower confidence — air quality models get fuzzier the further out they go, so re-check daily.</div>
   </div>
 
   <div class="card" style="margin-bottom:16px">
@@ -426,6 +440,100 @@
       if (toIso.slice(0, 10) === fromIso.slice(0, 10)) toLbl = fmtHour(toIso);
       return lbl(fromIso) + " → " + toLbl;
     }
+
+    // ----- Getting outdoors: per-day chances below a personal AQI limit -----
+    var WAKE_START = 7, WAKE_END = 21; // 7am–9pm
+    var todayStr = wx.current.time.slice(0, 10);
+    var thInput = el("thresh");
+    var savedTh = 110;
+    try { savedTh = parseInt(localStorage.getItem("outdoorAqiThreshold"), 10) || 110; } catch (e) {}
+    thInput.value = savedTh;
+    thInput.addEventListener("change", function () {
+      var v = Math.max(20, Math.min(300, parseInt(thInput.value, 10) || 110));
+      thInput.value = v;
+      try { localStorage.setItem("outdoorAqiThreshold", String(v)); } catch (e) {}
+      renderOutdoors();
+    });
+
+    function outdoorDayName(date, idx) {
+      var name = dayLabel(date, idx);
+      return idx <= 1 ? name : name + " " + dateLabel(date);
+    }
+
+    function renderOutdoors() {
+      var TH = parseInt(thInput.value, 10) || 110;
+      var j, h;
+
+      // Headline: first future daytime hour under the limit
+      var next = null;
+      for (j = 0; j < aT.length; j++) {
+        h = parseInt(aT[j].slice(11, 13), 10);
+        if (aT[j].slice(0, 13) >= nowIso && h >= WAKE_START && h < WAKE_END && aAqi[j] != null && aAqi[j] < TH) { next = j; break; }
+      }
+      if (next != null) {
+        var nd = aT[next].slice(0, 10);
+        var prefix = nd === todayStr ? "Today" : dayLabel(nd, nd === wx.daily.time[1] ? 1 : 99) + (nd === wx.daily.time[1] ? "" : " " + dateLabel(nd));
+        el("outdoorHead").textContent = "Next chance to get outside: " + prefix + " around " + fmtHour(aT[next]) + " (forecast AQI " + Math.round(aAqi[next]) + ")";
+        el("outdoorDot").style.background = "#00e400";
+      } else {
+        el("outdoorHead").textContent = "No daytime hours below AQI " + TH + " in the 7-day forecast — plan on indoor days for now.";
+        el("outdoorDot").style.background = "#ff0000";
+      }
+
+      var out = el("outdoorDays");
+      out.innerHTML = "";
+      var dDates2 = wx.daily.time;
+      for (var di = 0; di < dDates2.length; di++) {
+        var date = dDates2[di];
+        // future daytime hours for this day
+        var idxs = [];
+        for (j = 0; j < aT.length; j++) {
+          h = parseInt(aT[j].slice(11, 13), 10);
+          if (aT[j].slice(0, 10) === date && h >= WAKE_START && h < WAKE_END && aAqi[j] != null && aT[j].slice(0, 13) >= nowIso) idxs.push(j);
+        }
+        var row = document.createElement("div");
+        row.className = "window-row";
+        if (!idxs.length) {
+          if (di === 0) {
+            row.innerHTML = '<span class="when">Today</span><span class="why">Daytime hours are over — see tomorrow.</span>';
+            out.appendChild(row);
+          }
+          continue;
+        }
+        var hoursBelow = 0, minA = Infinity;
+        var best = { len: 0, start: -1, end: -1 }, runStart = -1;
+        for (var k = 0; k < idxs.length; k++) {
+          var a = aAqi[idxs[k]];
+          if (a < minA) minA = a;
+          if (a < TH) {
+            hoursBelow++;
+            if (runStart < 0) runStart = k;
+            if (k - runStart + 1 > best.len) best = { len: k - runStart + 1, start: runStart, end: k };
+          } else runStart = -1;
+        }
+        var verdict, color;
+        if (hoursBelow === 0)                    { verdict = "UNLIKELY";      color = "#ff0000"; }
+        else if (hoursBelow <= 3)                { verdict = "BRIEF WINDOW";  color = "#ff7e00"; }
+        else if (hoursBelow <= idxs.length * 0.6){ verdict = "DECENT CHANCE"; color = "#ffff00"; }
+        else                                     { verdict = "GOOD CHANCE";   color = "#00e400"; }
+        var why;
+        if (hoursBelow === 0) {
+          why = "Forecast stays above " + TH + " all day (lowest ~" + Math.round(minA) + ")";
+        } else {
+          var wFrom = fmtHour(aT[idxs[best.start]]);
+          var wTo = fmtHour(aT[idxs[best.end]]);
+          why = hoursBelow + " of " + idxs.length + " daytime hrs below " + TH +
+                " · best stretch " + (wFrom === wTo ? "around " + wFrom : wFrom + "–" + wTo) +
+                " (AQI down to ~" + Math.round(minA) + ")";
+        }
+        row.innerHTML =
+          '<span class="when">' + outdoorDayName(date, di) + '</span>' +
+          '<span class="why">' + why + '</span>' +
+          '<span class="pill" style="background:' + color + '">' + verdict + '</span>';
+        out.appendChild(row);
+      }
+    }
+    renderOutdoors();
 
     // ----- 7-day daily AQI prediction -----
     var daily = {}; // date -> {peak, sum, n}
