@@ -120,6 +120,7 @@
   .day .ddate { color: var(--muted); font-size: 0.75rem; margin-bottom: 8px; }
   .day .daqi { font-size: 1.7rem; font-weight: 800; }
   .day .dcat { font-size: 0.72rem; font-weight: 700; margin-bottom: 8px; }
+  .day .dworst { color: var(--muted); font-size: 0.72rem; margin-bottom: 6px; }
   .day .dwind { color: var(--muted); font-size: 0.8rem; border-top: 1px solid var(--border); padding-top: 6px; margin-top: 4px; }
   .day .arrow { display: inline-block; font-size: 1rem; }
 
@@ -250,6 +251,8 @@
       <span><i style="background:var(--very-unhealthy)"></i>Very Unhealthy 201–300</span>
       <span><i style="background:var(--hazardous)"></i>Hazardous 301+</span>
     </div>
+    <div class="fineprint">Each card shows the day's typical air; "worst" is the smokiest hour of that day.</div>
+    <div class="fineprint" id="adjNote" style="display:none"></div>
   </div>
 
   <div class="card">
@@ -934,6 +937,26 @@
           note("📡 Live from " + n + " PurpleAir sensor" + (n > 1 ? "s" : "") + " near us (nearest: " +
                sensors[0].name + ", " + sensors[0].dist.toFixed(1) + " mi) · the forecast model says " + nowAqi + ".");
           renderHero(parseInt(thInput.value, 10) || 110);
+
+          // When the model disagrees with our sensors, nudge the next 48 h of
+          // forecast toward reality (full correction now, fading to none at +48 h).
+          var offset = liveAqi - nowAqi;
+          if (Math.abs(offset) >= 10) {
+            var i0 = 0, q;
+            for (q = 0; q < aT.length; q++) { if (aT[q].slice(0, 13) >= nowIso) { i0 = q; break; } }
+            for (q = 0; q < aAqi.length; q++) {
+              if (aAqi[q] == null) continue;
+              var w = q < i0 ? 1 : Math.max(0, 1 - (q - i0) / 48);
+              aAqi[q] = Math.max(0, aAqi[q] + offset * w);
+            }
+            renderOutdoors();
+            renderDays();
+            renderHours();
+            var adj = el("adjNote");
+            adj.style.display = "block";
+            adj.textContent = "📡 The next 2 days were adjusted toward our live sensors (the model was reading about " +
+              Math.abs(Math.round(offset)) + " points too " + (offset < 0 ? "high" : "low") + " for our valley).";
+          }
         }).catch(function (err) {
           if (err.message === "badkey") {
             if (!usingDefault) {
@@ -952,54 +975,66 @@
     })();
 
     // ----- 7-day daily AQI cards -----
-    var daily = {};
-    for (i = 0; i < aT.length; i++) {
-      var day = aT[i].slice(0, 10);
-      if (!daily[day]) daily[day] = { peak: 0, sum: 0, n: 0 };
-      if (aAqi[i] != null) {
-        daily[day].peak = Math.max(daily[day].peak, aAqi[i]);
-        daily[day].sum += aAqi[i]; daily[day].n++;
+    function renderDays() {
+      var daily = {};
+      var i2;
+      for (i2 = 0; i2 < aT.length; i2++) {
+        var day = aT[i2].slice(0, 10);
+        if (!daily[day]) daily[day] = { peak: 0, sum: 0, n: 0 };
+        if (aAqi[i2] != null) {
+          daily[day].peak = Math.max(daily[day].peak, aAqi[i2]);
+          daily[day].sum += aAqi[i2]; daily[day].n++;
+        }
+      }
+      var dEl = el("days");
+      dEl.innerHTML = "";
+      var dDates = wx.daily.time;
+      for (i2 = 0; i2 < dDates.length; i2++) {
+        var date = dDates[i2];
+        var d = daily[date];
+        if (!d || !d.n) continue;
+        var typ = Math.round(d.sum / d.n);
+        var peak = Math.round(d.peak);
+        var lv = aqiLevel(typ);
+        var card = document.createElement("div");
+        card.className = "day";
+        card.style.borderTopColor = lv.color;
+        card.innerHTML =
+          '<div class="dname">' + dayLabel(date, i2) + '</div>' +
+          '<div class="ddate">' + dateLabel(date) + '</div>' +
+          '<div class="daqi" style="color:' + lv.color + '">' + typ + '</div>' +
+          '<div class="dcat" style="color:' + lv.color + '">' + lv.name + '</div>' +
+          '<div class="dworst">worst hour ~' + peak + '</div>' +
+          '<div class="dwind"><span class="arrow">' + dirArrow(wx.daily.wind_direction_10m_dominant[i2]) + '</span> ' +
+            dirName(wx.daily.wind_direction_10m_dominant[i2]) + ' ' + Math.round(wx.daily.wind_speed_10m_max[i2]) + ' mph' +
+            (wx.daily.precipitation_sum[i2] >= 0.5 ? ' · 🌧️' : '') + '</div>';
+        dEl.appendChild(card);
       }
     }
-    var dEl = el("days");
-    dEl.innerHTML = "";
-    var dDates = wx.daily.time;
-    for (i = 0; i < dDates.length; i++) {
-      var date = dDates[i];
-      var d = daily[date];
-      if (!d || !d.n) continue;
-      var peak = Math.round(d.peak);
-      var lv = aqiLevel(peak);
-      var card = document.createElement("div");
-      card.className = "day";
-      card.style.borderTopColor = lv.color;
-      card.innerHTML =
-        '<div class="dname">' + dayLabel(date, i) + '</div>' +
-        '<div class="ddate">' + dateLabel(date) + '</div>' +
-        '<div class="daqi" style="color:' + lv.color + '">' + peak + '</div>' +
-        '<div class="dcat" style="color:' + lv.color + '">' + lv.name + '</div>' +
-        '<div class="dwind"><span class="arrow">' + dirArrow(wx.daily.wind_direction_10m_dominant[i]) + '</span> ' +
-          dirName(wx.daily.wind_direction_10m_dominant[i]) + ' ' + Math.round(wx.daily.wind_speed_10m_max[i]) + ' mph' +
-          (wx.daily.precipitation_sum[i] >= 0.5 ? ' · 🌧️' : '') + '</div>';
-      dEl.appendChild(card);
-    }
+    renderDays();
 
     // ----- Hourly strip (next 24h) -----
-    var hEl = el("hours");
-    hEl.innerHTML = "";
-    for (i = startIdx; i < Math.min(startIdx + 24, hT.length); i++) {
-      var t = hT[i];
-      var a2 = aqiByTime[t];
-      var lvh = a2 != null ? aqiLevel(Math.round(a2)) : null;
-      var hour = document.createElement("div");
-      hour.className = "hour";
-      hour.innerHTML =
-        '<div class="h">' + (t.slice(0, 10) !== hT[startIdx].slice(0, 10) && fmtHour(t) === "12am" ? dayLabel2(t) : "") + fmtHour(t) + '</div>' +
-        '<div class="haqi" style="background:' + (lvh ? lvh.color : "#555") + '">' + (a2 != null ? Math.round(a2) : "–") + '</div>' +
-        '<span class="harrow">' + dirArrow(hWd[i]) + '</span>' +
-        '<div class="hw">' + Math.round(hWs[i]) + ' mph</div>';
-      hEl.appendChild(hour);
+    function renderHours() {
+      var byTime = {};
+      var i2;
+      for (i2 = 0; i2 < aT.length; i2++) byTime[aT[i2]] = aAqi[i2];
+      var hEl = el("hours");
+      hEl.innerHTML = "";
+      for (i2 = startIdx; i2 < Math.min(startIdx + 24, hT.length); i2++) {
+        var t = hT[i2];
+        var a2 = byTime[t];
+        var lvh = a2 != null ? aqiLevel(Math.round(a2)) : null;
+        var hour = document.createElement("div");
+        hour.className = "hour";
+        hour.innerHTML =
+          '<div class="h">' + (t.slice(0, 10) !== hT[startIdx].slice(0, 10) && fmtHour(t) === "12am" ? dayLabel2(t) : "") + fmtHour(t) + '</div>' +
+          '<div class="haqi" style="background:' + (lvh ? lvh.color : "#555") + '">' + (a2 != null ? Math.round(a2) : "–") + '</div>' +
+          '<span class="harrow">' + dirArrow(hWd[i2]) + '</span>' +
+          '<div class="hw">' + Math.round(hWs[i2]) + ' mph</div>';
+        hEl.appendChild(hour);
+      }
     }
+    renderHours();
   }
 })();
 </script>
