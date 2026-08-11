@@ -9,7 +9,7 @@ A single-page web app for **Moyie Springs, Idaho** (Boundary County, 48.727°N 1
 
 - **Air quality right now** — US EPA AQI, PM2.5 and PM10, color-coded to the official EPA scale, with plain-English health advice.
 - **Wind right now** — speed, gusts, and a compass showing which way the wind is moving.
-- **Getting outdoors** — the heart of the app: for each of the next 7 days, the chance you can get outside with the AQI below your personal limit (default **110**, adjustable and remembered by your browser). Shows how many daytime hours (7am–9pm) are forecast under the limit, the best stretch of the day, and a verdict: Good chance / Decent chance / Brief window / Unlikely. A headline tells you the next hour you're likely able to step out.
+- **Getting outdoors** — the heart of the app: for each of the next 7 days, the chance you can get outside with the AQI below your personal limit (default **100**, adjustable and remembered by your browser). Shows how many daytime hours (7am–9pm) are forecast under the limit, the best stretch of the day, and a verdict: Good chance / Decent chance / Brief window / Unlikely. A headline tells you the next hour you're likely able to step out.
 - **Smoke-clearing outlook** — scans the next 48 hours for "clearing windows": times when wind speed and atmospheric mixing depth (boundary-layer height) are high enough to ventilate smoke out of the valley. Rain hours get a bonus since precipitation scrubs smoke from the air. Also tells you whether the AQI forecast is trending better or worse over the next 24 hours.
 - **7-day air quality prediction** — daily peak AQI forecast, plus each day's dominant wind direction and max wind speed.
 - **Next 24 hours** — hour-by-hour AQI and wind strip.

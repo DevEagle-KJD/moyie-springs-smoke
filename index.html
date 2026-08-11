@@ -742,11 +742,11 @@
     var WAKE_START = 7, WAKE_END = 21;
     var todayStr = wx.current.time.slice(0, 10);
     var thInput = el("thresh");
-    var savedTh = 110;
-    try { savedTh = parseInt(localStorage.getItem("outdoorAqiThreshold"), 10) || 110; } catch (e) {}
+    var savedTh = 100;
+    try { savedTh = parseInt(localStorage.getItem("outdoorAqiThreshold"), 10) || 100; } catch (e) {}
     thInput.value = savedTh;
     thInput.addEventListener("change", function () {
-      var v = Math.max(20, Math.min(300, parseInt(thInput.value, 10) || 110));
+      var v = Math.max(20, Math.min(300, parseInt(thInput.value, 10) || 100));
       thInput.value = v;
       try { localStorage.setItem("outdoorAqiThreshold", String(v)); } catch (e) {}
       renderOutdoors();
@@ -781,7 +781,7 @@
     }
 
     function renderOutdoors() {
-      var TH = parseInt(thInput.value, 10) || 110;
+      var TH = parseInt(thInput.value, 10) || 100;
       renderHero(TH);
       var j, h;
 
@@ -936,7 +936,7 @@
           var n = Math.min(5, sensors.length);
           note("📡 Live from " + n + " PurpleAir sensor" + (n > 1 ? "s" : "") + " near us (nearest: " +
                sensors[0].name + ", " + sensors[0].dist.toFixed(1) + " mi) · the forecast model says " + nowAqi + ".");
-          renderHero(parseInt(thInput.value, 10) || 110);
+          renderHero(parseInt(thInput.value, 10) || 100);
 
           // When the model disagrees with our sensors, nudge the next 48 h of
           // forecast toward reality (full correction now, fading to none at +48 h).
