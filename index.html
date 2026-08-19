@@ -817,21 +817,23 @@
       var he = el("heroEmoji"), hb = el("heroBig"), hs = el("heroSub");
       var shown = liveAqi != null ? liveAqi : nowAqi;
       var src = liveAqi != null ? " (live from the sensors near us)" : " (forecast estimate)";
+      // Color follows the official EPA scale (same as the PurpleAir map);
+      // the YES/NO verdict follows our family limit. The two darkest EPA
+      // colors get brightened a touch so text stays readable on dark blue.
+      var heroColor = aqiLevel(shown).color;
+      var textSafe = { "#8f3f97": "#b46abc", "#7e0023": "#d4405e" };
+      hb.style.color = textSafe[heroColor] || heroColor;
       if (shown <= TH * 0.6) {
         he.textContent = "😄"; hb.textContent = "YES — go get some fresh air!";
-        hb.style.color = "#00e400";
         hs.textContent = "The air number is " + shown + src + ", well under our family limit of " + TH + ".";
       } else if (shown <= TH) {
         he.textContent = "🙂"; hb.textContent = "OK to go outside";
-        hb.style.color = "#a8e05f";
         hs.textContent = "The air number is " + shown + src + " — under our limit of " + TH + ", but not squeaky clean.";
       } else if (shown <= TH + 40) {
         he.textContent = "😕"; hb.textContent = "Not right now — close, though";
-        hb.style.color = "#ff7e00";
         hs.textContent = "The air number is " + shown + src + ", a bit over our limit of " + TH + ". Check the list below for a better time.";
       } else {
         he.textContent = "😷"; hb.textContent = "NO — indoor day";
-        hb.style.color = "#ff5252";
         hs.textContent = "The air number is " + shown + src + ", way over our limit of " + TH + ". The list below shows our next chance.";
       }
     }
