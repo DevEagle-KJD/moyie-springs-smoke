@@ -88,12 +88,12 @@
   .explain { color: var(--muted); font-size: 0.95rem; }
   .rows { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
   .row {
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex; flex-direction: column; align-items: flex-start;
     background: var(--card-2); border-radius: 10px; padding: 11px 14px;
-    font-size: 0.95rem; gap: 10px; flex-wrap: wrap;
+    font-size: 0.95rem; gap: 6px;
   }
   .row .when { font-weight: 700; }
-  .row .why { color: var(--muted); font-size: 0.87rem; flex: 1 1 220px; }
+  .row .why { color: var(--muted); font-size: 0.87rem; }
   .pill {
     padding: 3px 11px; border-radius: 999px; font-size: 0.78rem; font-weight: 800;
     color: #10141a; white-space: nowrap;
