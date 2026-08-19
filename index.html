@@ -355,7 +355,12 @@
     if (precipMm >= 0.5) score = Math.min(3, score + 1);
     return score;
   }
-  var VENT_LABELS = ["Poor — smoke sticks around", "So-so", "Fair — some clearing", "Good — smoke should blow out"];
+  var VENT_LABELS = [
+    "the air is stuck — not enough wind to move the smoke",
+    "only a little smoke is moving out",
+    "the wind is slowly thinning the smoke",
+    "the wind is actively pushing smoke out"
+  ];
   var VENT_COLORS = ["#ff7e00", "#ffff00", "#a8e05f", "#00e400"];
 
   function fmtHour(iso) {
@@ -749,6 +754,7 @@
       : trend < 0 ? "Good news: the forecast says the air gets better over the next day."
       : "Heads up: the forecast says the air gets worse over the next day.";
     el("outlookText").textContent =
+      "This is about the wind's muscle — how fast smoke is getting moved out of the valley — not how clean the air is yet. " +
       "Smoke clears out when the wind is strong, the afternoon warms up (warm air lifts smoke away), or it rains. " + trendTxt;
 
     function dayLabel2(iso) {
