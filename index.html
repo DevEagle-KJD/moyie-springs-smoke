@@ -904,14 +904,26 @@
         } else {
           var wFrom = fmtHour(aT[idxs[best.start]]);
           var wTo = fmtHour(aT[idxs[best.end]]);
-          // A far-out "clean" day while we're sitting in thick smoke means the
-          // model is betting on a big change — flag it so nobody plans blind.
+          // A clean forecast with fires upwind means the model is counting on
+          // the weather to handle the smoke — say what it's counting on, and
+          // what to watch for if that doesn't happen.
           var shownNow = liveAqi != null ? liveAqi : nowAqi;
-          var hedge = (di >= 2 && shownNow >= TH + 30 && minA < shownNow - 50)
-            ? " · big change predicted — re-check as it gets closer" : "";
+          var caveat = "";
+          if (risk && risk.level === 2) {
+            if (wx.daily.precipitation_sum[di] >= 0.5)
+              caveat = " · clean because rain 🌧️ should knock the smoke down — if the rain skips us, expect smokier";
+            else if (di > 0 && wx.daily.precipitation_sum[di - 1] >= 0.5)
+              caveat = " · clean because the day-before rain should have doused things — check that morning";
+            else if (wx.daily.wind_speed_10m_max[di] >= 10)
+              caveat = " · clean because steady wind should keep smoke moving through — if winds die down, expect smokier";
+            else
+              caveat = " · fires are upwind though, so check the air that morning";
+          } else if (di >= 2 && shownNow >= TH + 30 && minA < shownNow - 50) {
+            caveat = " · big change predicted — re-check as it gets closer";
+          }
           why = hoursBelow + " of " + idxs.length + " daytime hrs under " + TH +
                 " · best time " + (wFrom === wTo ? "around " + wFrom : wFrom + "–" + wTo) +
-                " (air down to ~" + Math.round(minA) + ")" + windTag + hedge;
+                " (air down to ~" + Math.round(minA) + ")" + windTag + caveat;
         }
         row.innerHTML =
           '<span class="when">' + outdoorDayName(date, di) + '</span>' +
