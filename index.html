@@ -936,6 +936,9 @@
               caveat = " · clean because the day-before rain should have doused things — check that morning";
             else if (wx.daily.wind_speed_10m_max[di] >= 10)
               caveat = " · clean because steady wind should keep smoke moving through — if winds die down, expect smokier";
+            else if (risk.top)
+              caveat = " · the smoke model expects the plume from those fires (~" + Math.round(risk.top.distMi) +
+                       " mi away) to thin out or miss us — smoke rarely travels that far in a straight line, but check the air that morning";
             else
               caveat = " · fires are upwind though, so check the air that morning";
           } else if (di >= 2 && shownNow >= TH + 30 && minA < shownNow - 50) {
