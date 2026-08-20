@@ -273,6 +273,18 @@
 (function () {
   "use strict";
 
+  // iPhone home-screen apps resume a frozen copy of the page instead of
+  // reloading. Whenever the app comes back on screen with data older than
+  // 10 minutes, pull everything fresh.
+  var loadedAt = Date.now();
+  function refreshIfStale() {
+    if (document.visibilityState === "visible" && Date.now() - loadedAt > 10 * 60 * 1000) {
+      location.reload();
+    }
+  }
+  document.addEventListener("visibilitychange", refreshIfStale);
+  window.addEventListener("pageshow", function (e) { if (e.persisted) refreshIfStale(); });
+
   var LAT = 48.7266, LON = -116.1902, TZ = "America/Los_Angeles";
 
   var WEATHER_URL = "https://api.open-meteo.com/v1/forecast" +
