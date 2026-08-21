@@ -587,7 +587,7 @@
   var DEFAULT_PA_KEY = "F0A0551A-953B-11F1-9E30-4201AC1DC129";
   function fetchPaSensors(key) {
     var url = "https://api.purpleair.com/v1/sensors" +
-      "?fields=" + encodeURIComponent("name,latitude,longitude,humidity,pm2.5_10minute") +
+      "?fields=" + encodeURIComponent("name,latitude,longitude,pm2.5_10minute") +
       "&location_type=0&max_age=7200" +
       "&nwlng=-116.65&nwlat=48.95&selng=-115.75&selat=48.55";
     return fetch(url, { headers: { "X-API-Key": key } }).then(function (r) {
@@ -600,16 +600,11 @@
       return (data.data || []).map(function (row) {
         var raw = row[fi["pm2.5_10minute"]];
         if (raw == null) return null;
-        // US EPA conversion (Barkjohn et al.) — corrects PurpleAir's tendency
-        // to read high in wildfire smoke; same conversion as AirNow's Fire &
-        // Smoke Map and the "US EPA" option on the PurpleAir map.
-        var rh = row[fi.humidity] != null ? row[fi.humidity] : 50;
-        var corr = raw <= 343 ? 0.524 * raw - 0.0862 * rh + 5.75
-                              : 0.46 * raw + 3.93e-4 * raw * raw + 2.97;
+        // Raw reading, conversion "None" — matches the family's PurpleAir map settings
         return {
           name: row[fi.name],
           dist: distMiles(LAT, LON, row[fi.latitude], row[fi.longitude]),
-          aqi: pm25ToAqi(Math.max(0, corr))
+          aqi: pm25ToAqi(Math.max(0, raw))
         };
       }).filter(Boolean).sort(function (a, b) { return a.dist - b.dist; });
     });
