@@ -87,8 +87,15 @@ if (aqi < LIMIT && state.armed) {
   console.log("Alert sent (ntfy HTTP " + r.status + ")");
   state.armed = false;
 } else if (aqi > REARM && !state.armed) {
+  const msg = "The air just climbed above " + REARM + " — it's " + aqi +
+              " right now in Moyie Springs. Time to head back inside. 😷";
+  const r = await fetch("https://ntfy.sh/" + NTFY_TOPIC, {
+    method: "POST",
+    headers: { Title: "Moyie Air - time to head back in", Priority: "high", Tags: "warning" },
+    body: msg
+  });
+  console.log("Back-inside alert sent (ntfy HTTP " + r.status + ")");
   state.armed = true;
-  console.log("Air back above " + REARM + " — re-armed for the next clean window.");
 }
 
 fs.writeFileSync(STATE_FILE, JSON.stringify(state) + "\n");
