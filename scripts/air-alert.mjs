@@ -81,7 +81,7 @@ if (aqi < LIMIT && state.armed) {
               " right now in Moyie Springs. Good time to get outside! 🍃";
   const r = await fetch("https://ntfy.sh/" + NTFY_TOPIC, {
     method: "POST",
-    headers: { Title: "Moyie Air — time to get outside!", Priority: "high", Tags: "leaves" },
+    headers: { Title: "Moyie Air - time to get outside!", Priority: "high", Tags: "leaves" },
     body: msg
   });
   console.log("Alert sent (ntfy HTTP " + r.status + ")");
