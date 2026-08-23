@@ -8,8 +8,8 @@ import fs from "node:fs";
 
 const KEY = "F0A0551A-953B-11F1-9E30-4201AC1DC129";
 const NTFY_TOPIC = "moyie-springs-air-3x7k";
-const LIMIT = 100;   // alert when the air drops below this
-const REARM = 110;   // re-arm for the next alert once air rises above this
+const LIMIT = 100;   // alert when the air drops below this (fires at 99 or lower)
+const REARM = 105;   // re-arm for the next alert once air rises above this
 const LAT = 48.7266, LON = -116.1902;
 const STATE_FILE = "alert-state.json";
 
