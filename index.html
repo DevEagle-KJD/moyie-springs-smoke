@@ -641,10 +641,19 @@
   }
 
   // ---- NOAA planetary Kp index (geomagnetic activity, free JSON, no key) ----
-  var KP_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
+  // Two independent feeds: official 3-hour values for the history strip, and
+  // the 1-minute estimated Kp for the "right now" headline. Each retries once,
+  // and the card renders with whichever half is available.
+  var KP_HIST_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
+  var KP_NOW_URL = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
+  function fetchJSONRetry(url) {
+    return fetchJSON(url).catch(function () {
+      return new Promise(function (res) { setTimeout(res, 2500); }).then(function () { return fetchJSON(url); });
+    });
+  }
   function fetchKp() {
-    return fetchJSON(KP_URL).then(function (rows) {
-      if (!rows || !rows.length || rows.length < 2) return null;
+    var hist = fetchJSONRetry(KP_HIST_URL).then(function (rows) {
+      if (!rows || rows.length < 2) return null;
       var out = [];
       for (var i = 1; i < rows.length; i++) {
         var v = parseFloat(rows[i][1]);
@@ -652,6 +661,16 @@
       }
       return out.length ? out : null;
     }).catch(function () { return null; });
+    var now = fetchJSONRetry(KP_NOW_URL).then(function (arr) {
+      if (!arr || !arr.length) return null;
+      var last = arr[arr.length - 1];
+      var v = parseFloat(last.estimated_kp != null ? last.estimated_kp : last.kp_index);
+      return isNaN(v) ? null : { t: last.time_tag, kp: v };
+    }).catch(function () { return null; });
+    return Promise.all([hist, now]).then(function (r) {
+      if (!r[0] && !r[1]) return null;
+      return { hist: r[0], now: r[1] };
+    });
   }
 
   Promise.all([fetchWeather(), fetchJSON(AIR_URL), fetchFires(), fetchPaInitial(), fetchKp()]).then(function (r) {
@@ -1133,26 +1152,34 @@
     if (!kpData) {
       el("kpHead").textContent = "Field data isn't answering right now";
       el("kpDot").style.background = "#9db0c5";
-      el("kpText").textContent = "Couldn't reach NOAA's space-weather feed — try again later.";
+      el("kpText").textContent = "Couldn't reach NOAA's space-weather feed — pull down to refresh in a few minutes.";
     } else {
-      var latest = kpData[kpData.length - 1];
+      var latest = kpData.now ||
+        (kpData.hist ? kpData.hist[kpData.hist.length - 1] : null);
       var lvlK = kpLevel(latest.kp);
-      el("kpHead").textContent = "Kp " + latest.kp.toFixed(1) + " — " + lvlK.name;
+      el("kpHead").textContent = "Kp " + latest.kp.toFixed(1) + " — " + lvlK.name +
+        (kpData.now ? " (live estimate)" : "");
       el("kpDot").style.background = lvlK.color;
       el("kpText").textContent = lvlK.text;
       var bars = el("kpBars");
       bars.innerHTML = "";
-      // last 24 hours = eight 3-hour readings
-      kpData.slice(-8).forEach(function (d) {
-        var lv = kpLevel(d.kp);
-        var b = document.createElement("div");
-        b.className = "hour";
-        var hh = d.t.slice(11, 16);
-        b.innerHTML = '<div class="h">' + hh + '</div>' +
-          '<div class="haqi" style="background:' + lv.color + '">' + d.kp.toFixed(1) + '</div>' +
-          '<div class="hw">Kp</div>';
-        bars.appendChild(b);
-      });
+      if (kpData.hist) {
+        // last 24 hours = eight official 3-hour readings, labeled in our time
+        kpData.hist.slice(-8).forEach(function (d) {
+          var lv = kpLevel(d.kp);
+          var b = document.createElement("div");
+          b.className = "hour";
+          var hh = "";
+          try {
+            hh = new Date(d.t.replace(" ", "T").replace(/\.\d+$/, "") + "Z")
+              .toLocaleString("en-US", { timeZone: TZ, hour: "numeric" });
+          } catch (e) { hh = d.t.slice(11, 16); }
+          b.innerHTML = '<div class="h">' + hh + '</div>' +
+            '<div class="haqi" style="background:' + lv.color + '">' + d.kp.toFixed(1) + '</div>' +
+            '<div class="hw">Kp</div>';
+          bars.appendChild(b);
+        });
+      }
     }
   }
 })();
