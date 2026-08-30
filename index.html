@@ -255,9 +255,19 @@
     <div class="fineprint" id="adjNote" style="display:none"></div>
   </div>
 
-  <div class="card">
+  <div class="card" style="margin-bottom:16px">
     <h2>🕐 Hour by Hour Today (arrows show where the wind is going)</h2>
     <div class="hours" id="hours"></div>
+  </div>
+
+  <div class="card">
+    <h2>🌍 Earth's Magnetic Field Today</h2>
+    <div class="headline"><span class="dot" id="kpDot"></span><span id="kpHead">–</span></div>
+    <div class="explain" id="kpText">–</div>
+    <div class="hours" id="kpBars" style="margin-top:12px"></div>
+    <div class="fineprint">This is NOAA's Kp index (0–9): the standard measure of the solar-driven disturbance behind "Schumann resonance" spikes. Nobody publishes the actual Schumann numbers as open data, but when Kp storms, those charts light up — see the
+      <a href="https://www.heartmath.org/gci/gcms/live-data/" target="_blank" rel="noopener" style="color:var(--accent)">live spectrograms here</a>.
+      Science on how any of this affects people is still early — read it as a curiosity, not a health meter.</div>
   </div>
 
 </div>
@@ -630,8 +640,22 @@
     return Promise.race([req, timeout]);
   }
 
-  Promise.all([fetchWeather(), fetchJSON(AIR_URL), fetchFires(), fetchPaInitial()]).then(function (r) {
-    render(r[0], r[1], r[2], r[3]);
+  // ---- NOAA planetary Kp index (geomagnetic activity, free JSON, no key) ----
+  var KP_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
+  function fetchKp() {
+    return fetchJSON(KP_URL).then(function (rows) {
+      if (!rows || !rows.length || rows.length < 2) return null;
+      var out = [];
+      for (var i = 1; i < rows.length; i++) {
+        var v = parseFloat(rows[i][1]);
+        if (!isNaN(v)) out.push({ t: rows[i][0], kp: v });
+      }
+      return out.length ? out : null;
+    }).catch(function () { return null; });
+  }
+
+  Promise.all([fetchWeather(), fetchJSON(AIR_URL), fetchFires(), fetchPaInitial(), fetchKp()]).then(function (r) {
+    render(r[0], r[1], r[2], r[3], r[4]);
   }).catch(function (err) {
     el("loading").style.display = "none";
     var e = el("error");
@@ -651,7 +675,17 @@
     return 500;
   }
 
-  function render(wx, air, fires, pa) {
+  function kpLevel(kp) {
+    if (kp < 3) return { name: "Quiet",              color: "#00e400", text: "The Earth's magnetic field is calm — the Schumann charts should be flat and ordinary today." };
+    if (kp < 4) return { name: "Unsettled",          color: "#ffff00", text: "A little restless, but nothing unusual — minor ripples in the field." };
+    if (kp < 5) return { name: "Active",             color: "#ff7e00", text: "The field is stirred up — the resonance charts may show some elevated activity." };
+    if (kp < 6) return { name: "Minor storm (G1)",   color: "#ff0000", text: "A minor geomagnetic storm is underway — this is when the Schumann charts start lighting up." };
+    if (kp < 7) return { name: "Moderate storm (G2)",color: "#ff0000", text: "A moderate geomagnetic storm — expect big spikes on the resonance charts, and maybe auroras tonight!" };
+    if (kp < 8) return { name: "Strong storm (G3)",  color: "#8f3f97", text: "A strong geomagnetic storm — major activity on every field chart, with a good aurora chance this far north." };
+    return       { name: "Severe storm (G4–G5)",     color: "#7e0023", text: "A severe geomagnetic storm — rare, big event. The charts will be dramatic, and auroras are very likely." };
+  }
+
+  function render(wx, air, fires, pa, kpData) {
     el("loading").style.display = "none";
     el("app").style.display = "block";
     el("updated").textContent = "Updated " + new Date().toLocaleString("en-US", { timeZone: TZ }) + " · reopen or pull down to refresh";
@@ -1094,6 +1128,32 @@
     renderOutdoors();
     renderDays();
     renderHours();
+
+    // ----- Earth's magnetic field (NOAA Kp index) -----
+    if (!kpData) {
+      el("kpHead").textContent = "Field data isn't answering right now";
+      el("kpDot").style.background = "#9db0c5";
+      el("kpText").textContent = "Couldn't reach NOAA's space-weather feed — try again later.";
+    } else {
+      var latest = kpData[kpData.length - 1];
+      var lvlK = kpLevel(latest.kp);
+      el("kpHead").textContent = "Kp " + latest.kp.toFixed(1) + " — " + lvlK.name;
+      el("kpDot").style.background = lvlK.color;
+      el("kpText").textContent = lvlK.text;
+      var bars = el("kpBars");
+      bars.innerHTML = "";
+      // last 24 hours = eight 3-hour readings
+      kpData.slice(-8).forEach(function (d) {
+        var lv = kpLevel(d.kp);
+        var b = document.createElement("div");
+        b.className = "hour";
+        var hh = d.t.slice(11, 16);
+        b.innerHTML = '<div class="h">' + hh + '</div>' +
+          '<div class="haqi" style="background:' + lv.color + '">' + d.kp.toFixed(1) + '</div>' +
+          '<div class="hw">Kp</div>';
+        bars.appendChild(b);
+      });
+    }
   }
 })();
 </script>
