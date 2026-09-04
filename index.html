@@ -159,7 +159,7 @@
 
 <header>
   <h1>🌲 Moyie Springs Smoke &amp; Air</h1>
-  <div class="sub">Boundary County, Idaho &middot; live wildfire smoke, wind &amp; 7-day air forecast</div>
+  <div class="sub">Boundary County, Idaho &middot; live wildfire smoke, wind &amp; multi-day air forecast</div>
 </header>
 <div class="updated" id="updated">Loading&hellip;</div>
 <div class="error" id="error"></div>
@@ -230,7 +230,7 @@
     <h2>🚶 Can We Get Outside This Week? (our air limit: <input type="number" id="thresh" min="20" max="300" step="5"> )</h2>
     <div class="headline"><span class="dot" id="outdoorDot"></span><span id="outdoorHead">–</span></div>
     <div class="rows" id="outdoorDays"></div>
-    <div class="fineprint">Counts daytime hours (7am–9pm) forecast below your limit. 🍃 = wind from a direction with no big fires. 🔥 = wind from fire country. Days 4–7 are a rougher guess — check back each morning.</div>
+    <div class="fineprint">Counts daytime hours (7am–9pm) forecast below your limit. 🍃 = wind from a direction with no big fires. 🔥 = wind from fire country. The last few days are a rougher guess — check back each morning.</div>
   </div>
 
   <div class="card" style="margin-bottom:16px">
@@ -241,7 +241,7 @@
   </div>
 
   <div class="card" style="margin-bottom:16px">
-    <h2 id="daysTitle">📅 The Next 7 Days</h2>
+    <h2 id="daysTitle">📅 The Next Several Days</h2>
     <div class="days" id="days"></div>
     <div class="legend">
       <span><i style="background:var(--good)"></i>Good 0–50</span>
@@ -928,7 +928,7 @@
         el("outdoorHead").textContent = "Next chance to get outside: " + prefix + " around " + fmtHour(aT[next]) + windNote;
         el("outdoorDot").style.background = "#00e400";
       } else {
-        el("outdoorHead").textContent = "No daytime hours under " + TH + " in the 7-day forecast — plan on indoor days for now.";
+        el("outdoorHead").textContent = "No daytime hours under " + TH + " in the forecast — plan on indoor days for now.";
         el("outdoorDot").style.background = "#ff0000";
       }
 
