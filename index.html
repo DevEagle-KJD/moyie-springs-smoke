@@ -947,8 +947,11 @@
         if (!idxs.length) {
           if (di === 0) {
             row.innerHTML = '<span class="when">Today</span><span class="why">Daytime is over — see tomorrow.</span>';
-            out.appendChild(row);
+          } else {
+            row.innerHTML = '<span class="when">' + outdoorDayName(date, di) + '</span>' +
+              '<span class="why">The air model doesn\'t reach this far out yet — check back tomorrow.</span>';
           }
+          out.appendChild(row);
           continue;
         }
         var hoursBelow = 0, minA = Infinity;
@@ -1104,7 +1107,24 @@
       for (i2 = 0; i2 < dDates.length; i2++) {
         var date = dDates[i2];
         var d = daily[date];
-        if (!d || !d.n) continue;
+        if (!d || !d.n) {
+          // The smoke model only reaches ~5-6 days out; keep the card so the
+          // week stays 7 wide, and say why it's blank.
+          var ph = document.createElement("div");
+          ph.className = "day";
+          ph.style.borderTopColor = "var(--border)";
+          ph.innerHTML =
+            '<div class="dname">' + dayLabel(date, i2) + '</div>' +
+            '<div class="ddate">' + dateLabel(date) + '</div>' +
+            '<div class="daqi" style="color:var(--muted)">–</div>' +
+            '<div class="dcat" style="color:var(--muted)">not ready yet</div>' +
+            '<div class="dworst">air model reaches ~5 days</div>' +
+            '<div class="dwind"><span class="arrow">' + dirArrow(wx.daily.wind_direction_10m_dominant[i2]) + '</span> ' +
+              dirName(wx.daily.wind_direction_10m_dominant[i2]) + ' ' + Math.round(wx.daily.wind_speed_10m_max[i2]) + ' mph' +
+              (wx.daily.precipitation_sum[i2] >= 0.5 ? ' · 🌧️' : '') + '</div>';
+          dEl.appendChild(ph);
+          continue;
+        }
         var typ = Math.round(d.sum / d.n);
         var peak = Math.round(d.peak);
         var lv = aqiLevel(typ);
